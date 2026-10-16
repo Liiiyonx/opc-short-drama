@@ -90,6 +90,18 @@ async def list_assets(db: AsyncSession, work_id: int, kind: str) -> list[WorkAss
     )
 
 
+# 资产类型 → 文件扩展名（保证下载后可直接播放/打开）
+_KIND_EXT = {
+    "audio": "mp3",
+    "audio_merged": "mp3",
+    "srt": "srt",
+    "json": "json",
+    "video": "mp4",
+    "image": "png",
+    "text": "txt",
+}
+
+
 async def save_asset(
     db: AsyncSession,
     work_id: int | None,
@@ -103,7 +115,8 @@ async def save_asset(
     work_id 为空时只写存储（直调智能体场景），键照常返回。
     """
     prefix = f"works/{work_id}/{kind}" if work_id else f"tmp/{kind}"
-    key = generate_key(prefix, f"asset.{kind}")
+    ext = _KIND_EXT.get(kind, "bin")
+    key = generate_key(prefix, f"asset.{ext}")
     get_storage().put(key, data, mime)
     if work_id is None:
         return None, key
