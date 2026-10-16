@@ -90,7 +90,8 @@ async def list_works(
 async def get_work_detail(
     db: AsyncSession, user: User, work_id: int
 ) -> tuple[Work, list[WorkAsset], list[Work]]:
-    work = await _load_my_work(db, user, work_id)
+    # 只读详情：教师可查看学生作品（批改需要）
+    work = await _load_my_work(db, user, work_id, write=False)
     assets = (
         (
             await db.execute(

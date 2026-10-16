@@ -20,13 +20,24 @@ def _not_found() -> HTTPException:
     )
 
 
-async def load_my_work(db: AsyncSession, user: User, work_id: int) -> Work:
+async def load_my_work(
+    db: AsyncSession, user: User, work_id: int, write: bool = True
+) -> Work:
+    """加载作品并校验权限。
+
+    write=True：仅本人（或 admin）可操作；
+    write=False：教师可只读查看（批改场景），其余角色仍限本人。
+    """
     work = (
         await db.execute(select(Work).where(Work.id == work_id))
     ).scalar_one_or_none()
-    if work is None or (work.created_by != user.id and user.role != "admin"):
+    if work is None:
         raise _not_found()
-    return work
+    if work.created_by == user.id or user.role == "admin":
+        return work
+    if not write and user.role == "teacher":
+        return work
+    raise _not_found()
 
 
 async def latest_json_asset(db: AsyncSession, work_id: int) -> dict | None:

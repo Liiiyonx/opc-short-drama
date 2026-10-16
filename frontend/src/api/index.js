@@ -105,7 +105,54 @@ export function submitAiDeclare(id, payload) {
 
 // ---------- 异步任务 ----------
 export function getTask(taskId) {
+  return http.get(`/agent-tasks/${taskId}`)
+}
+
+// ---------- 实训任务 ----------
+export function listTasks() {
+  return http.get('/tasks')
+}
+
+export function createTask(payload) {
+  return http.post('/tasks', payload)
+}
+
+export function getTaskDetail(taskId) {
   return http.get(`/tasks/${taskId}`)
+}
+
+export function submitTask(taskId, payload) {
+  return http.post(`/tasks/${taskId}/submit`, payload)
+}
+
+export function closeTask(taskId) {
+  return http.post(`/tasks/${taskId}/close`)
+}
+
+export function listSubmissions(taskId) {
+  return http.get(`/tasks/${taskId}/submissions`)
+}
+
+// ---------- 批改与能力 ----------
+export function reviewWork(workId, payload) {
+  return http.post(`/works/${workId}/review`, payload)
+}
+
+export function getWorkReview(workId) {
+  return http.get(`/works/${workId}/review`)
+}
+
+export function getStudentAbility(studentId) {
+  return http.get(`/ability/students/${studentId}`)
+}
+
+export function getClassAbility(classId) {
+  return http.get(`/ability/classes/${classId}`)
+}
+
+// ---------- 课程 ----------
+export function listCourses() {
+  return http.get('/courses')
 }
 
 export default http

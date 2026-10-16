@@ -31,9 +31,14 @@ const routes = [
   {
     path: '/teacher',
     name: 'teacher-home',
-    component: () => import('../views/common/Placeholder.vue'),
-    meta: { role: 'teacher' },
-    props: { title: '教师端', note: '教学工作台 / 任务管理 / 批改 / 能力图谱，第 6 周上线' }
+    component: () => import('../views/teacher/Home.vue'),
+    meta: { role: 'teacher' }
+  },
+  {
+    path: '/teacher/tasks/:taskId',
+    name: 'teacher-task-detail',
+    component: () => import('../views/teacher/TaskDetail.vue'),
+    meta: { role: 'teacher' }
   },
   {
     path: '/enterprise',

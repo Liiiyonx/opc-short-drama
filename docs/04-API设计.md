@@ -56,16 +56,18 @@
 | POST | /works/{id}/ai-declare | 提交 AI 使用声明 `{agents_used, human_edit_ratio, note}` |
 | GET | /files/{key} | 流式读取存储文件（需登录；local 后端读盘，minio 代理下载） |
 
-### 3.4 实训任务与批改
+### 3.4 实训任务与批改（W6 已实现）
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | /tasks | 任务列表（学生：可接；教师：我发布的） |
-| POST | /tasks | 教师发布任务 |
-| GET | /tasks/{id} | 任务详情 + Rubric |
-| POST | /tasks/{id}/submit | 学生提交交付物 |
+| GET | /tasks | 任务列表（学生：已发布可接；教师：我发布的；admin：全部） |
+| POST | /tasks | 教师发布任务 `{title, brief, course_id?, deadline?, team_rule, rubric?, publish}`；rubric 权重自动归一化，维度须为五维之一 |
+| GET | /tasks/{id} | 任务详情 + Rubric（学生视角附 my_submission） |
+| POST | /tasks/{id}/submit | 学生提交 `{work_ids, note}`；校验归属/截止，回写 works.task_id |
 | POST | /tasks/{id}/close | 教师截止任务 |
-| POST | /works/{id}/review | 教师 Rubric 批改 → 触发能力快照 |
-| GET | /works/{id}/review | 查看批改结果 |
+| GET | /tasks/{id}/submissions | 提交列表（教师视角，含学生与作品明细） |
+| POST | /works/{id}/review | 教师 Rubric 批改 `{criterion_scores, comment}` → 逐维落能力快照 |
+| GET | /works/{id}/review | 查看批改结果（最新 + 历史） |
+| GET | /courses | 课程列表（任务绑定用） |
 
 ### 3.5 工单
 | 方法 | 路径 | 说明 |
@@ -78,21 +80,23 @@
 | GET | /orders/{id}/bids | 投标列表（企业视角） |
 | POST | /orders/{id}/award | 企业定标 `{bid_id}` |
 
-### 3.6 能力图谱
+### 3.6 能力图谱（W6 已实现）
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | /ability/students/{id} | 个人五维能力 + 成长曲线（按快照聚合） |
-| GET | /ability/classes/{id} | 班级能力分布 |
+| GET | /ability/students/{id} | 个人五维能力（latest 快照聚合）+ 成长曲线（history） |
+| GET | /ability/classes/{id} | 班级能力分布（各维最新分均值） |
 
 ### 3.7 异步任务（音视频长任务）
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | POST | /agents/tts/invoke | 入队，返回 `{task_id}` |
-| GET | /tasks/{task_id} | 轮询 `{status, progress, result?, error?}` |
+| GET | /agent-tasks/{task_id} | 轮询 `{status, result?, error?}`（task_id 即 agent_sessions.id） |
 
+> 命名说明：异步轮询原定 `/tasks/{id}`，因与 §3.4 教学任务路由冲突，W6 起重命名为 `/agent-tasks/{id}`。
+>
 > 异步智能体（tts / compose）经作品 generate 入口入队后返回 `session_id`，
 > 由 arq worker（`python -m arq app.workers.tasks.WorkerSettings`）执行，
-> 前端轮询 `GET /tasks/{session_id}`：running → success / failed。P1 升级 SSE。
+> 前端轮询 `GET /agent-tasks/{session_id}`：running → success / failed。P1 升级 SSE。
 
 > P1 升级：SSE `/agents/stream/{session_id}` 推送生成进度。
 

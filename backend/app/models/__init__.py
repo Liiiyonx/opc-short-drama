@@ -6,5 +6,7 @@ from app.models.profile import (  # noqa: F401
     StudentProfile,
     TeacherProfile,
 )
+from app.models.review import AbilitySnapshot, WorkReview  # noqa: F401
+from app.models.task import TaskSubmission, TeamMember, TrainingTask  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.work import Work, WorkAsset  # noqa: F401

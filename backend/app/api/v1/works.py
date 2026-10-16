@@ -1,9 +1,10 @@
-"""作品与资产 API（W3）。"""
-from fastapi import APIRouter, File, Form, Query, UploadFile
+"""作品与资产 API（W3）+ Rubric 批改入口（W6）。"""
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
-from app.core.deps import CurrentUser, DbSession
+from app.core.deps import CurrentUser, DbSession, require_role
 from app.core.responses import ok
 from app.models.work import WorkAsset
+from app.schemas.task import ReviewIn, ReviewOut
 from app.schemas.work import (
     AiDeclareIn,
     AssetOut,
@@ -12,6 +13,7 @@ from app.schemas.work import (
     WorkCreateIn,
     WorkOut,
 )
+from app.services import tasks as tasks_service
 from app.services import works as works_service
 from app.services.storage.factory import get_storage
 from sqlalchemy import select
@@ -169,5 +171,42 @@ async def list_assets(work_id: int, user: CurrentUser, db: DbSession):
         {
             "work_id": work.id,
             "items": [_asset_dict(asset) for asset in assets],
+        }
+    )
+
+
+@router.post(
+    "/{work_id}/review",
+    summary="教师 Rubric 批改（触发能力快照）",
+    dependencies=[Depends(require_role("teacher", "admin"))],
+)
+async def review_work(
+    work_id: int, body: ReviewIn, user: CurrentUser, db: DbSession
+):
+    data = await tasks_service.review_work(db, user, work_id, body)
+    review = data["review"]
+    return ok(
+        {
+            "review": ReviewOut.model_validate(review).model_dump(mode="json"),
+            "total": data["total"],
+            "passed": data["passed"],
+        },
+        "批改完成",
+    )
+
+
+@router.get("/{work_id}/review", summary="查看批改结果")
+async def get_review(work_id: int, user: CurrentUser, db: DbSession):
+    data = await tasks_service.get_work_review(db, user, work_id)
+    return ok(
+        {
+            "work_id": data["work_id"],
+            "latest": ReviewOut.model_validate(data["latest"]).model_dump(mode="json")
+            if data["latest"]
+            else None,
+            "history": [
+                ReviewOut.model_validate(item).model_dump(mode="json")
+                for item in data["history"]
+            ],
         }
     )

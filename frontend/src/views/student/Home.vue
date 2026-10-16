@@ -20,6 +20,52 @@
       </el-col>
     </el-row>
 
+    <el-row :gutter="12" class="mid-row">
+      <el-col :span="14">
+        <el-card shadow="never" class="mid-card">
+          <template #header><span>我的任务</span></template>
+          <el-table :data="tasks" size="small" empty-text="暂时没有进行中的实训任务">
+            <el-table-column prop="title" label="任务" min-width="150" show-overflow-tooltip />
+            <el-table-column label="截止" width="120">
+              <template #default="{ row }">{{ row.deadline ? String(row.deadline).slice(5, 16).replace('T', ' ') : '不限' }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag v-if="row.my_status === 'reviewed'" size="small" type="success">已批改</el-tag>
+                <el-tag v-else-if="row.my_status === 'submitted'" size="small" type="warning">待批改</el-tag>
+                <el-tag v-else size="small" type="info">未提交</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100">
+              <template #default="{ row }">
+                <el-button
+                  size="small"
+                  type="primary"
+                  :disabled="row.my_status === 'submitted' || row.my_status === 'reviewed'"
+                  @click="openSubmit(row)"
+                >提交作品</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+      <el-col :span="10">
+        <el-card shadow="never" class="mid-card">
+          <template #header>
+            <span>我的能力</span>
+            <el-button size="small" text type="primary" @click="loadAbility">刷新</el-button>
+          </template>
+          <template v-if="abilityLatest.length">
+            <div v-for="item in abilityLatest" :key="item.dimension" class="ability-line">
+              <span class="ability-name">{{ item.dimension }}</span>
+              <el-progress :percentage="item.score" :stroke-width="10" :color="abilityColor" />
+            </div>
+          </template>
+          <el-empty v-else description="完成实训批改后展示五维能力" :image-size="60" />
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-card shadow="never">
       <template #header>
         <span>我的作品</span>
@@ -59,15 +105,38 @@
         <el-button type="primary" :disabled="!newTitle.trim()" @click="createAndEnter">创建并进入工坊</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="submitDialog" :title="`提交作品：${submitTarget ? submitTarget.title : ''}`" width="520px">
+      <p class="submit-tip">选择要提交的作品（可多选），提交后教师将按 Rubric 批改并更新你的五维能力。</p>
+      <el-checkbox-group v-model="submitWorkIds" class="submit-works">
+        <el-checkbox v-for="work in readyWorks" :key="work.id" :label="work.id" border>
+          {{ TYPE_LABELS[work.type] || work.type }} · {{ work.title }}
+        </el-checkbox>
+      </el-checkbox-group>
+      <el-empty v-if="!readyWorks.length" description="暂无已完成的作品，请先在创作工坊完成生成" :image-size="60" />
+      <el-input v-model="submitNote" type="textarea" :rows="2" maxlength="200" placeholder="给老师的留言（选填）" class="submit-note" />
+      <template #footer>
+        <el-button type="primary" :disabled="!submitWorkIds.length" :loading="submitting" @click="doSubmit">提交</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 
+import {
+  getStudentAbility,
+  getTaskDetail,
+  listTasks as apiListTasks,
+  submitTask
+} from '../../api/index.js'
 import { useUserStore } from '../../stores/user.js'
 import { useWorkStore } from '../../stores/work.js'
+
+const DIMENSIONS = ['内容创作', '跨文化沟通', '电商运营', 'AI工具应用', '数据分析']
 
 const TYPE_LABELS = {
   script: '剧本',
@@ -90,6 +159,83 @@ const router = useRouter()
 
 const newDialog = ref(false)
 const newTitle = ref('')
+const tasks = ref([])
+const abilityLatest = ref([])
+const submitDialog = ref(false)
+const submitTarget = ref(null)
+const submitWorkIds = ref([])
+const submitNote = ref('')
+const submitting = ref(false)
+
+const readyWorks = computed(() =>
+  workStore.works.filter((work) => work.status === 'ready')
+)
+
+function abilityColor(percentage) {
+  if (percentage >= 85) return '#67c23a'
+  if (percentage >= 60) return '#e6a23c'
+  return '#f56c6c'
+}
+
+async function loadTasks() {
+  try {
+    const data = await apiListTasks()
+    const items = []
+    for (const task of data.items) {
+      let myStatus = null
+      try {
+        const detail = await getTaskDetail(task.id)
+        myStatus = detail.my_submission ? detail.my_submission.status : null
+      } catch {
+        myStatus = null
+      }
+      items.push({ ...task, my_status: myStatus })
+    }
+    tasks.value = items
+  } catch {
+    tasks.value = []
+  }
+}
+
+async function loadAbility() {
+  const me = userStore.profile
+  if (!me) return
+  try {
+    const data = await getStudentAbility(me.id)
+    abilityLatest.value = DIMENSIONS
+      .filter((dimension) => data.latest[dimension] !== undefined)
+      .map((dimension) => ({
+        dimension,
+        score: Math.round(data.latest[dimension])
+      }))
+  } catch {
+    abilityLatest.value = []
+  }
+}
+
+function openSubmit(task) {
+  submitTarget.value = task
+  submitWorkIds.value = []
+  submitNote.value = ''
+  submitDialog.value = true
+}
+
+async function doSubmit() {
+  submitting.value = true
+  try {
+    await submitTask(submitTarget.value.id, {
+      work_ids: submitWorkIds.value,
+      note: submitNote.value || null
+    })
+    ElMessage.success('提交成功，等待教师批改')
+    submitDialog.value = false
+    await loadTasks()
+  } catch (error) {
+    ElMessage.error(error.message || '提交失败')
+  } finally {
+    submitting.value = false
+  }
+}
 
 const works = computed(() => workStore.works)
 const loading = computed(() => workStore.loading)
@@ -149,6 +295,8 @@ onMounted(async () => {
     await userStore.fetchMe()
   }
   await reload()
+  await loadTasks()
+  await loadAbility()
 })
 </script>
 
@@ -174,6 +322,37 @@ onMounted(async () => {
 }
 .stat-row {
   margin-bottom: 16px;
+}
+.mid-row {
+  margin-bottom: 16px;
+}
+.mid-card {
+  height: 100%;
+}
+.ability-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.ability-name {
+  width: 84px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  flex-shrink: 0;
+}
+.submit-tip {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.submit-works {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.submit-note {
+  margin-top: 12px;
 }
 .stat-card {
   text-align: center;

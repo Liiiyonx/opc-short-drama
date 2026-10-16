@@ -34,7 +34,9 @@ class Work(Base):
     id: Mapped[int] = mapped_column(PK_BIGINT, primary_key=True, autoincrement=True)
     owner_type: Mapped[str] = mapped_column(String(10), default="user")
     owner_id: Mapped[int] = mapped_column(BigInteger, index=True)
-    task_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # W6 补外键
+    task_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("training_tasks.id"), nullable=True
+    )
     title: Mapped[str] = mapped_column(String(200))
     type: Mapped[str] = mapped_column(String(20))
     version: Mapped[int] = mapped_column(Integer, default=1)
