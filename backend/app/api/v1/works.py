@@ -9,6 +9,8 @@ from app.schemas.work import (
     AiDeclareIn,
     AssetOut,
     GenerateIn,
+    PublishParamsIn,
+    RevisionIn,
     TextAssetIn,
     WorkCreateIn,
     WorkOut,
@@ -89,7 +91,7 @@ async def generate_work(
                 "status": "running",
             }
         )
-        return ok(data, "已入队，请轮询 /api/v1/tasks/{session_id} 查看进度")
+        return ok(data, "已入队，请轮询 /api/v1/agent-tasks/{session_id} 查看进度")
     data.update(
         {
             "session_id": result.get("session_id"),
@@ -193,6 +195,29 @@ async def review_work(
         },
         "批改完成",
     )
+
+
+@router.post("/{work_id}/publish-params", summary="生成发布参数包（成片作品）")
+async def create_publish_params(
+    work_id: int, body: PublishParamsIn, user: CurrentUser, db: DbSession
+):
+    work, result = await works_service.generate_publish_params(db, user, work_id, body)
+    return ok(
+        {
+            "work_id": work.id,
+            "session_id": result.get("session_id"),
+            "result": result.get("result"),
+        },
+        "发布参数已生成",
+    )
+
+
+@router.post("/{work_id}/revision", summary="提交人工修订产物（自动比对差异度）")
+async def submit_revision(
+    work_id: int, body: RevisionIn, user: CurrentUser, db: DbSession
+):
+    data = await works_service.submit_revision(db, user, work_id, body)
+    return ok(data, "修订已保存，已自动计算与 AI 原版的差异度")
 
 
 @router.get("/{work_id}/review", summary="查看批改结果")

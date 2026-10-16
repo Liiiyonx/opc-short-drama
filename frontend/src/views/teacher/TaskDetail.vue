@@ -81,7 +81,7 @@ import { ElMessage } from 'element-plus'
 import ReviewDrawer from '../../components/ReviewDrawer.vue'
 import { getTaskDetail, listSubmissions } from '../../api/index.js'
 
-const TYPE_LABELS = { script: '剧本', storyboard: '分镜', audio: '配音', subtitle: '字幕', video: '成片' }
+const TYPE_LABELS = { script: '剧本', storyboard: '分镜', translate: '翻译本地化', audio: '配音', subtitle: '字幕', video: '成片' }
 const STATUS_LABELS = { draft: '草稿', published: '进行中', closed: '已截止' }
 const SUB_LABELS = { submitted: '待批改', reviewed: '已批改', returned: '已退回' }
 

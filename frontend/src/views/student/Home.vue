@@ -142,6 +142,7 @@ const DIMENSIONS = ['内容创作', '跨文化沟通', '电商运营', 'AI工具
 const TYPE_LABELS = {
   script: '剧本',
   storyboard: '分镜',
+  translate: '翻译本地化',
   audio: '配音',
   subtitle: '字幕',
   video: '成片'

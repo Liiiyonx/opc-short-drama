@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     llm_provider: str = "openai_compat"  # openai_compat | mock（mock 仅无密钥联调用，显式启用，非回退）
     llm_base_url: str = "https://api.deepseek.com"
     llm_api_key: str = ""
-    llm_model_default: str = "deepseek-chat"
+    # 2026-10 官方现役模型名（deepseek-chat 别名已弃用，兼容映射到 v4-flash）
+    llm_model_default: str = "deepseek-v4-flash"
     llm_model_script: str = ""
     llm_model_storyboard: str = ""
     llm_model_translate: str = ""

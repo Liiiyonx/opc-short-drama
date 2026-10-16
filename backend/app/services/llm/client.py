@@ -137,7 +137,7 @@ async def chat_completion(
     if settings.llm_provider == "mock":
         from app.services.llm.mock import mock_reply
 
-        return mock_reply(route, agent_type)
+        return mock_reply(route, agent_type, user)
 
     if not settings.llm_api_key:
         raise LLMNotConfigured(NO_KEY_MESSAGE)
