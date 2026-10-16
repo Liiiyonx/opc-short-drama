@@ -28,9 +28,10 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { login } from '../api/http.js'
+import { useUserStore, roleHome } from '../stores/user.js'
 
 const router = useRouter()
+const userStore = useUserStore()
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 
@@ -41,19 +42,8 @@ async function onLogin() {
   }
   loading.value = true
   try {
-    const data = await login(form)
-    localStorage.setItem('opc_token', data.access_token)
-    if (data.refresh_token) {
-      localStorage.setItem('opc_refresh_token', data.refresh_token)
-    }
-    const role = data.user && data.user.role
-    if (role === 'teacher') {
-      router.push('/teacher')
-    } else if (role === 'enterprise') {
-      router.push('/enterprise')
-    } else {
-      router.push('/student')
-    }
+    const user = await userStore.login({ username: form.username, password: form.password })
+    router.push(roleHome(user.role))
   } catch (error) {
     ElMessage.error(error.message || '登录失败')
   } finally {

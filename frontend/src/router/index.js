@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { roleHome, useUserStore } from '../stores/user.js'
+
 const routes = [
   { path: '/', redirect: '/login' },
   {
@@ -13,8 +15,33 @@ const routes = [
     name: 'student-home',
     component: () => import('../views/student/Home.vue'),
     meta: { role: 'student' }
+  },
+  {
+    path: '/student/workshop',
+    name: 'workshop',
+    component: () => import('../views/student/Workshop.vue'),
+    meta: { role: 'student' }
+  },
+  {
+    path: '/student/workshop/:workId',
+    name: 'workshop-anchor',
+    component: () => import('../views/student/Workshop.vue'),
+    meta: { role: 'student' }
+  },
+  {
+    path: '/teacher',
+    name: 'teacher-home',
+    component: () => import('../views/common/Placeholder.vue'),
+    meta: { role: 'teacher' },
+    props: { title: '教师端', note: '教学工作台 / 任务管理 / 批改 / 能力图谱，第 6 周上线' }
+  },
+  {
+    path: '/enterprise',
+    name: 'enterprise-home',
+    component: () => import('../views/common/Placeholder.vue'),
+    meta: { role: 'enterprise' },
+    props: { title: '企业端', note: '工单发布 / 作品集市 / 遴选买单，第 7 周上线' }
   }
-  // teacher / enterprise 路由在第 6-7 周按端补齐
 ]
 
 const router = createRouter({
@@ -22,13 +49,22 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const token = localStorage.getItem('opc_token')
   if (!to.meta.public && !token) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.name === 'login' && token) {
     return { path: '/student' }
+  }
+  if (to.meta.role && token) {
+    const userStore = useUserStore()
+    if (!userStore.profile) {
+      await userStore.fetchMe()
+    }
+    if (userStore.profile && userStore.profile.role !== to.meta.role) {
+      return { path: roleHome(userStore.profile.role) }
+    }
   }
   return true
 })
