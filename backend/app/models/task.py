@@ -36,7 +36,9 @@ class TrainingTask(Base):
     deliverable_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft")
-    creator_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"))
+    creator_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     __table_args__ = (Index("ix_training_tasks_status_deadline", "status", "deadline"),)

@@ -7,7 +7,7 @@ import json
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent, AgentContext
-from app.services.llm.client import chat_completion, extract_json
+from app.services.llm.client import chat_json
 
 
 class ScriptInput(BaseModel):
@@ -52,7 +52,8 @@ class ScriptAgent(Agent):
     async def run(self, payload: ScriptInput, ctx: AgentContext) -> ScriptOutput:
         system = self.load_system_prompt()
         user_message = json.dumps(payload.model_dump(mode="json"), ensure_ascii=False)
-        reply = await chat_completion(system=system, user=user_message, agent_type=self.name)
-        ctx.usage.update(reply.usage)
-        data = extract_json(reply.content)
+        data, usage = await chat_json(
+            system=system, user=user_message, agent_type=self.name
+        )
+        ctx.usage.update(usage)
         return self.output_schema.model_validate(data)

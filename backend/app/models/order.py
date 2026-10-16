@@ -37,7 +37,9 @@ class WorkOrder(Base):
     __tablename__ = "work_orders"
 
     id: Mapped[int] = mapped_column(PK_BIGINT, primary_key=True, autoincrement=True)
-    enterprise_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"))
+    enterprise_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id"), index=True
+    )
     title: Mapped[str] = mapped_column(String(200))
     requirements_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     budget_cents: Mapped[int] = mapped_column(BigInteger, default=0)
@@ -58,7 +60,9 @@ class OrderBid(Base):
     order_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("work_orders.id"), index=True
     )
-    bidder_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"))
+    bidder_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id"), index=True
+    )
     amount_cents: Mapped[int] = mapped_column(BigInteger)
     proposal: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")

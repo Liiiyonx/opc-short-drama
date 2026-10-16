@@ -28,7 +28,7 @@ class AgentSession(Base):
         BigInteger, ForeignKey("works.id"), nullable=True, index=True
     )
     agent_type: Mapped[str] = mapped_column(String(30))
-    status: Mapped[str] = mapped_column(String(20), default="running")
+    status: Mapped[str] = mapped_column(String(20), default="running", index=True)
     input_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     output_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)

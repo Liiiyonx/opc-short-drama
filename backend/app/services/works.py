@@ -359,17 +359,25 @@ async def set_ai_declare(
 
 
 async def finalize_work_from_session(db: AsyncSession, session) -> None:
-    """异步智能体完成后推进关联作品状态（arq worker 调用）。
+    """异步智能体结束后推进关联作品状态（arq worker 调用）。
 
-    资产已由智能体自身写入（ctx.work_id）；这里只更新作品状态与摘要。
+    - success：资产已由智能体自身写入（ctx.work_id），这里只更新状态与摘要；
+    - failed：作品从 generating 回落为 failed，避免前端永久等待。
     异步作品的再生成不建版本链（P1 项），资产按次追加。
     """
-    if session.work_id is None or session.status != "success":
+    if session.work_id is None:
         return
     work = (
         await db.execute(select(Work).where(Work.id == session.work_id))
     ).scalar_one_or_none()
-    if work is None or work.status == "ready":
+    if work is None:
+        return
+    if session.status == "failed":
+        if work.status == "generating":
+            work.status = "failed"
+            await db.commit()
+        return
+    if session.status != "success" or work.status == "ready":
         return
     result = session.output_json or {}
     work.status = "ready"

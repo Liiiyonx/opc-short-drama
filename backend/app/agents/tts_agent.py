@@ -2,7 +2,13 @@
 
 契约见 docs/05-智能体设计.md §3.3；is_async=True，由 arq worker 执行。
 音色映射见 services/tts/voices.py；SRT 时间轴按逐行真实时长累加。
+
+性能：逐行合成走 asyncio.gather + 并发上限（TTS_CONCURRENCY），
+20 行台词从串行 N×1s 降到 ~N/4×1s；DB 写入保持串行
+（AsyncSession 不可并发使用），顺序与 gather 输入一致。
 """
+import asyncio
+
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent, AgentContext
@@ -47,17 +53,33 @@ class TTSAgent(Agent):
     async def run(self, payload: TTSInput, ctx: AgentContext) -> TTSOutput:
         provider = get_tts_provider()
         ctx.usage.update(
-            {"provider": get_settings().tts_provider, "model": "", "prompt_tokens": 0, "completion_tokens": 0}
+            {
+                "provider": get_settings().tts_provider,
+                "model": "",
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+            }
         )
 
+        # 并行合成（保序：gather 按输入顺序返回）
+        semaphore = asyncio.Semaphore(max(1, get_settings().tts_concurrency))
+
+        async def _synth(line: TTSLine):
+            voice = pick_voice(line.role, line.lang, payload.voice_map)
+            async with semaphore:
+                result = await provider.synthesize(line.text, voice)
+            return line, result
+
+        synthesized = await asyncio.gather(
+            *(_synth(line) for line in payload.lines)
+        )
+
+        # 串行落库 + 构建 SRT 时间轴
         assets: list[TTSAsset] = []
         parts: list[bytes] = []
         cues: list[dict] = []
         cursor_ms = 0
-
-        for line in payload.lines:
-            voice = pick_voice(line.role, line.lang, payload.voice_map)
-            result = provider.synthesize(line.text, voice)
+        for line, result in synthesized:
             _, audio_key = await save_asset(
                 ctx.db,
                 ctx.work_id,
@@ -90,7 +112,7 @@ class TTSAgent(Agent):
 
         merged_key = None
         if parts:
-            merged = concat_audio(parts)
+            merged = await asyncio.to_thread(concat_audio, parts)
             _, merged_key = await save_asset(
                 ctx.db,
                 ctx.work_id,

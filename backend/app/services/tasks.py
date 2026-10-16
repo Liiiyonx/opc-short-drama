@@ -15,6 +15,7 @@ from app.models.task import TaskSubmission, TrainingTask
 from app.models.user import User
 from app.models.work import Work
 from app.schemas.task import ReviewIn, TaskCreateIn
+from app.services.ability import latest_scores_by_dimension
 
 # 默认 Rubric：五项对应五维能力，权重合计 1.0
 DEFAULT_RUBRIC = {
@@ -263,42 +264,66 @@ async def list_submissions(
         .scalars()
         .all()
     )
+    if not rows:
+        return []
+
+    # 批量取学生 / 作品 / 批改数（三条查询，无 N+1）
+    submitter_ids = {s.submitter_id for s in rows}
+    users = (
+        (
+            await db.execute(select(User).where(User.id.in_(submitter_ids)))
+        )
+        .scalars()
+        .all()
+    )
+    name_map = {u.id: u.username for u in users}
+
+    all_work_ids = {wid for s in rows for wid in (s.work_ids_json or [])}
+    works = (
+        (
+            await db.execute(select(Work).where(Work.id.in_(all_work_ids)))
+        )
+        .scalars()
+        .all()
+        if all_work_ids
+        else []
+    )
+    work_map = {w.id: w for w in works}
+
+    reviewed_map: dict[int, int] = {}
+    if all_work_ids:
+        reviewed_rows = (
+            await db.execute(
+                select(WorkReview.work_id, func.count())
+                .where(WorkReview.work_id.in_(all_work_ids))
+                .group_by(WorkReview.work_id)
+            )
+        ).all()
+        reviewed_map = {work_id: count for work_id, count in reviewed_rows}
+
     items = []
     for submission in rows:
-        submitter = (
-            await db.execute(select(User).where(User.id == submission.submitter_id))
-        ).scalar_one_or_none()
         work_ids = submission.work_ids_json or []
-        works = (
-            (
-                await db.execute(select(Work).where(Work.id.in_(work_ids)))
-            )
-            .scalars()
-            .all()
-            if work_ids
-            else []
-        )
-        reviewed = (
-            await db.execute(
-                select(func.count())
-                .select_from(WorkReview)
-                .where(WorkReview.work_id.in_(work_ids))
-            )
-        ).scalar_one() if work_ids else 0
         items.append(
             {
                 "id": submission.id,
                 "task_id": submission.task_id,
                 "submitter_id": submission.submitter_id,
-                "submitter_name": submitter.username if submitter else "",
+                "submitter_name": name_map.get(submission.submitter_id, ""),
                 "work_ids": work_ids,
                 "works": [
-                    {"id": w.id, "title": w.title, "type": w.type, "status": w.status}
-                    for w in works
+                    {
+                        "id": work_map[wid].id,
+                        "title": work_map[wid].title,
+                        "type": work_map[wid].type,
+                        "status": work_map[wid].status,
+                    }
+                    for wid in work_ids
+                    if wid in work_map
                 ],
                 "note": submission.note,
                 "status": submission.status,
-                "reviewed_works": reviewed,
+                "reviewed_works": sum(reviewed_map.get(wid, 0) for wid in work_ids),
                 "submitted_at": submission.submitted_at,
             }
         )
@@ -431,22 +456,8 @@ async def _refresh_ability_cache(db: AsyncSession, student_id: int) -> None:
     ).scalar_one_or_none()
     if profile is None:
         return
-    latest: dict[str, float] = {}
-    for dimension in ABILITY_DIMENSIONS:
-        row = (
-            await db.execute(
-                select(AbilitySnapshot)
-                .where(
-                    AbilitySnapshot.student_id == student_id,
-                    AbilitySnapshot.dimension == dimension,
-                )
-                .order_by(AbilitySnapshot.id.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if row is not None:
-            latest[dimension] = float(row.score)
-    profile.ability_json = latest
+    # 单查询取「每维最新分」（原为每维一次查询）
+    profile.ability_json = await latest_scores_by_dimension(db, student_id)
 
 
 async def get_work_review(db: AsyncSession, user: User, work_id: int) -> dict:

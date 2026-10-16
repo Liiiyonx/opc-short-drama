@@ -8,11 +8,30 @@
     </template>
 
     <template v-else-if="work.status !== 'ready'">
+      <el-alert
+        v-if="work.status === 'failed'"
+        type="error"
+        :closable="false"
+        show-icon
+        title="上次合成失败，可直接重试；连续失败请检查后台 worker 与 ffmpeg"
+      />
+      <el-alert v-else-if="work.status === 'generating' && !polling" type="warning" :closable="false" show-icon title="任务正在后台处理中">
+        <template #default>
+          <span>稍后刷新查看结果；若长时间无进展，请确认 worker 已启动。</span>
+          <el-button size="small" text type="primary" @click="emit('refresh')">刷新状态</el-button>
+        </template>
+      </el-alert>
       <el-alert type="info" :closable="false" show-icon title="成片合成说明" description="按分镜顺序拼图 + 烧录字幕；未上传素材图时使用占位图，可在分镜步骤的作品资产中上传图片。" />
       <el-button type="primary" :loading="saving || polling" @click="onGenerate">
         {{ polling ? '合成中…' : '合成成片' }}
       </el-button>
       <el-progress v-if="polling" :percentage="pollPercent" :stroke-width="10" striped striped-flow :duration="2" />
+      <el-alert
+        v-if="polling && slow"
+        type="warning"
+        :closable="false"
+        title="处理时间较长：请确认后台 worker 已启动（仍会继续等待）"
+      />
       <el-alert v-if="pollError" type="error" :closable="false" :title="pollError" />
     </template>
 
@@ -71,7 +90,7 @@ const emit = defineEmits(['create', 'generated', 'refresh'])
 const saving = ref(false)
 const declaring = ref(false)
 const declared = ref(false)
-const { status, error: pollError, start, stop } = useTaskPoll()
+const { status, slow, error: pollError, start, stop } = useTaskPoll()
 
 const declareForm = ref({
   agents_used: ['script', 'storyboard', 'tts', 'compose'],

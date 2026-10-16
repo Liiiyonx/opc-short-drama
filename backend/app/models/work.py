@@ -35,7 +35,7 @@ class Work(Base):
     owner_type: Mapped[str] = mapped_column(String(10), default="user")
     owner_id: Mapped[int] = mapped_column(BigInteger, index=True)
     task_id: Mapped[int | None] = mapped_column(
-        BigInteger, ForeignKey("training_tasks.id"), nullable=True
+        BigInteger, ForeignKey("training_tasks.id"), nullable=True, index=True
     )
     title: Mapped[str] = mapped_column(String(200))
     type: Mapped[str] = mapped_column(String(20))
@@ -46,7 +46,9 @@ class Work(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     ai_declare_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     meta_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
-    created_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"))
+    created_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     __table_args__ = (

@@ -7,6 +7,25 @@
     </template>
 
     <template v-else-if="work.status !== 'ready'">
+      <el-alert
+        v-if="work.status === 'failed'"
+        type="error"
+        :closable="false"
+        show-icon
+        title="上次生成失败，可直接重试；连续失败请检查后台 worker 与 TTS 服务"
+      />
+      <el-alert
+        v-else-if="work.status === 'generating' && !polling"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="任务正在后台处理中"
+      >
+        <template #default>
+          <span>稍后刷新查看结果；若长时间无进展，请确认 worker 已启动。</span>
+          <el-button size="small" text type="primary" @click="emit('refresh')">刷新状态</el-button>
+        </template>
+      </el-alert>
       <el-form label-width="96px" class="gen-form">
         <el-form-item label="语言">
           <el-select v-model="lang" style="width: 200px">
@@ -23,6 +42,12 @@
         </el-form-item>
       </el-form>
       <el-progress v-if="polling" :percentage="pollPercent" :stroke-width="10" striped striped-flow :duration="2" />
+      <el-alert
+        v-if="polling && slow"
+        type="warning"
+        :closable="false"
+        title="处理时间较长：请确认后台 worker 已启动（仍会继续等待）"
+      />
       <el-alert v-if="pollError" type="error" :closable="false" :title="pollError" />
     </template>
 
@@ -65,7 +90,7 @@ const emit = defineEmits(['create', 'generated', 'refresh'])
 const lang = ref('zh-CN')
 const saving = ref(false)
 const regenerating = ref(false)
-const { status, error: pollError, start, stop } = useTaskPoll()
+const { status, slow, error: pollError, start, stop } = useTaskPoll()
 
 const polling = computed(() => status.value === 'running')
 const pollPercent = computed(() => (status.value === 'success' ? 100 : 65))
@@ -92,8 +117,7 @@ async function onGenerate() {
         },
         2000
       )
-    }
-  } finally {
+    }  } finally {
     saving.value = false
   }
 }

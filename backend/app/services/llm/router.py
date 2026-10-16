@@ -17,8 +17,10 @@ class ModelRoute:
 
 
 DEFAULT_ROUTES: dict[str, ModelRoute] = {
-    "script": ModelRoute("deepseek-chat", 0.8, 4096),
-    "storyboard": ModelRoute("deepseek-chat", 0.7, 4096),
+    # script/storyboard 输出体积大（多集大纲/多镜头列表），max_tokens 拉满
+    # 防截断；截断的 JSON 会被修复重试救场但会浪费一轮调用。
+    "script": ModelRoute("deepseek-chat", 0.8, 8192),
+    "storyboard": ModelRoute("deepseek-chat", 0.7, 8192),
     "translate": ModelRoute("deepseek-chat", 0.3, 4096),
     "analyze": ModelRoute("deepseek-chat", 0.2, 2048),
     "optimize": ModelRoute("deepseek-chat", 0.5, 2048),

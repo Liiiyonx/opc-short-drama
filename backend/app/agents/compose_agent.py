@@ -3,7 +3,12 @@
 图片来源：分镜作品的 image 资产（用户在 W3 上传接口上传）；
 无上传时按镜头数生成占位图（纯色 lavfi），保证链路可演示。
 is_async=True，由 arq worker 执行（ffmpeg CPU 密集）。
+
+阻塞调用（ffmpeg/ffprobe 子进程）统一走 asyncio.to_thread，
+避免卡住 worker 事件循环影响其他并发任务。
 """
+import asyncio
+
 from pydantic import BaseModel, Field
 
 from app.agents.base import Agent, AgentContext
@@ -62,17 +67,21 @@ class ComposeAgent(Agent):
         image_assets = await list_assets(ctx.db, storyboard.id, "image")
         placeholder = not image_assets
         if placeholder:
-            images = [
-                placeholder_png(index)
-                for index in range(len(shots["shots"]))
-            ]
+            images = list(
+                await asyncio.gather(
+                    *(
+                        asyncio.to_thread(placeholder_png, index)
+                        for index in range(len(shots["shots"]))
+                    )
+                )
+            )
         else:
             images = [storage.get_bytes(asset.storage_key) for asset in image_assets]
 
-        video_bytes = burn_video(
-            images, audio_bytes, srt_text, width=payload.width, height=payload.height
+        video_bytes = await asyncio.to_thread(
+            burn_video, images, audio_bytes, srt_text, payload.width, payload.height
         )
-        duration_ms = probe_duration_ms(video_bytes, ".mp4")
+        duration_ms = await asyncio.to_thread(probe_duration_ms, video_bytes, ".mp4")
         _, video_key = await save_asset(
             ctx.db,
             ctx.work_id,

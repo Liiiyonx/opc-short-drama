@@ -36,7 +36,9 @@ class WorkReview(Base):
     work_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("works.id"), index=True
     )
-    teacher_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"))
+    teacher_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id"), index=True
+    )
     rubric_score_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     # AI 初稿与学生终稿差异度 = 学生申报的人工修改比例（0-1）

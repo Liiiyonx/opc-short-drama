@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     # TTS
     tts_provider: str = "edge-tts"
+    tts_concurrency: int = 4  # 配音逐行并行合成的并发上限
+    # 异步任务卡死判定（秒）：worker 崩溃/未启动时，超时自动判失败
+    agent_task_timeout_seconds: int = 1800
 
     # 对象存储：local / minio
     storage_backend: str = "local"

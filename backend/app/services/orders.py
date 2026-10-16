@@ -9,9 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.order import OrderBid, WorkOrder
 from app.models.profile import EnterpriseProfile
-from app.models.review import ABILITY_DIMENSIONS, AbilitySnapshot
 from app.models.user import User
 from app.schemas.order import OrderCreateIn
+from app.services.ability import latest_scores_by_dimension
 
 ABILITY_BID_THRESHOLD = 60.0
 
@@ -29,25 +29,11 @@ def _conflict(message: str) -> HTTPException:
 
 
 async def _ability_average(db: AsyncSession, student_id: int) -> float | None:
-    """五维最新分均值；无任何评分数据返回 None。"""
-    scores = []
-    for dimension in ABILITY_DIMENSIONS:
-        row = (
-            await db.execute(
-                select(AbilitySnapshot)
-                .where(
-                    AbilitySnapshot.student_id == student_id,
-                    AbilitySnapshot.dimension == dimension,
-                )
-                .order_by(AbilitySnapshot.id.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
-        if row is not None:
-            scores.append(float(row.score))
-    if not scores:
+    """五维最新分均值；无任何评分数据返回 None（单查询，无 5×N）。"""
+    latest = await latest_scores_by_dimension(db, student_id)
+    if not latest:
         return None
-    return round(sum(scores) / len(scores), 2)
+    return round(sum(latest.values()) / len(latest), 2)
 
 
 async def create_order(

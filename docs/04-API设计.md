@@ -97,6 +97,10 @@
 > 异步智能体（tts / compose）经作品 generate 入口入队后返回 `session_id`，
 > 由 arq worker（`python -m arq app.workers.tasks.WorkerSettings`）执行，
 > 前端轮询 `GET /agent-tasks/{session_id}`：running → success / failed。P1 升级 SSE。
+>
+> 超时兜底（2026-10-16 优化轮）：running 超过 `AGENT_TASK_TIMEOUT_SECONDS`（默认 1800s）
+> 的会话在三处被自动判失败并回落作品状态——API 启动 / worker 启动 / 轮询 GET 惰性触发；
+> 失败响应带 `error` 说明与 `work_id`，前端据此刷新并提示。
 
 > P1 升级：SSE `/agents/stream/{session_id}` 推送生成进度。
 

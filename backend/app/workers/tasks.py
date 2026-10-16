@@ -1,9 +1,10 @@
 """arq worker：异步智能体任务执行。
 
 启动（backend/ 目录）：
-    python -m arq workers.tasks.WorkerSettings
+    python -m arq app.workers.tasks.WorkerSettings
 
 入队由 API 侧 enqueue_agent_job 完成；任务执行后推进关联作品状态。
+启动时清扫遗留 running 会话（上次 worker 崩溃/中断的兜底）。
 """
 from urllib.parse import urlparse
 
@@ -65,8 +66,21 @@ async def run_agent_job(ctx: dict, session_id: int) -> None:
             await finalize_work_from_session(db, session)
 
 
+async def _sweep_on_startup(ctx: dict) -> None:
+    """worker 启动清扫：把上次中断遗留的 running 会话判失败。"""
+    from app.agents.orchestrator import sweep_stale_sessions
+    from app.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        cleaned = await sweep_stale_sessions(db)
+    if cleaned:
+        print(f"[worker] 启动清扫：{cleaned} 个超时会话已判失败")
+
+
 class WorkerSettings:
     functions = [run_agent_job]
+    on_startup = _sweep_on_startup
     redis_settings = _redis_settings()
     max_jobs = 4
     job_timeout = 600  # 秒；视频合成留足时间
+    max_tries = 2  # 瞬态故障（如 DB 抖动）允许重试一轮；execute_session 幂等（非 running 直接跳过）

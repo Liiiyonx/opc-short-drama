@@ -6,16 +6,22 @@ VOICE_MAP: dict[str, dict[str, str]] = {
         "zh-CN": "zh-CN-XiaoxiaoNeural",
         "en-US": "en-US-AriaNeural",
         "ja-JP": "ja-JP-NanamiNeural",
+        "es-MX": "es-MX-DaliaNeural",
+        "ar-EG": "ar-EG-SalmaNeural",
     },
     "male": {
         "zh-CN": "zh-CN-YunxiNeural",
         "en-US": "en-US-GuyNeural",
         "ja-JP": "ja-JP-KeitaNeural",
+        "es-MX": "es-MX-JorgeNeural",
+        "ar-EG": "ar-EG-ShakirNeural",
     },
     "female": {
         "zh-CN": "zh-CN-XiaohanNeural",
         "en-US": "en-US-JennyNeural",
         "ja-JP": "ja-JP-AoiNeural",
+        "es-MX": "es-MX-DaliaNeural",
+        "ar-EG": "ar-EG-SalmaNeural",
     },
 }
 
@@ -33,10 +39,18 @@ MARKET_LANG: dict[str, str] = {
 
 
 def pick_voice(role: str, lang: str, voice_map: dict | None = None) -> str:
-    """优先用户显式 voice_map（{role: voice}），再按角色×语言内置表。"""
+    """优先用户显式 voice_map（{role: voice}），再按角色×语言内置表。
+
+    未知角色回退到该语言的旁白音色；未知语言回退默认音色。
+    """
     if voice_map and role in voice_map:
         return voice_map[role]
-    return VOICE_MAP.get(role, {}).get(lang, DEFAULT_VOICE)
+    narrator_voice = VOICE_MAP["narrator"].get(lang)
+    return (
+        VOICE_MAP.get(role, {}).get(lang)
+        or narrator_voice
+        or DEFAULT_VOICE
+    )
 
 
 def market_to_lang(target_market: str | None) -> str:
