@@ -26,12 +26,15 @@ class Settings(BaseSettings):
     jwt_refresh_expire_days: int = 7
 
     # LLM 多模型网关（OpenAI 兼容；默认云端 DeepSeek）
+    llm_provider: str = "openai_compat"  # openai_compat | mock（mock 仅无密钥联调用，显式启用，非回退）
     llm_base_url: str = "https://api.deepseek.com"
     llm_api_key: str = ""
     llm_model_default: str = "deepseek-chat"
     llm_model_script: str = ""
     llm_model_storyboard: str = ""
     llm_model_translate: str = ""
+    llm_timeout_seconds: int = 60
+    llm_max_retries: int = 1
 
     # TTS
     tts_provider: str = "edge-tts"
