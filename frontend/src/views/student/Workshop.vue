@@ -3,7 +3,7 @@
     <div class="workshop-head">
       <div>
         <h3 class="title">{{ chain.base || '创作工坊' }}</h3>
-        <span class="sub">AI 创作流水线：剧本 → 分镜 → 配音 → 字幕 → 成片，每步产物入库、可单步重跑</span>
+        <span class="sub">AI 创作流水线：剧本 → 分镜 → 翻译本地化（可选）→ 配音 → 字幕 → 成片，每步产物入库、可单步重跑</span>
       </div>
       <div>
         <el-button v-if="chain.works.script" text type="primary" @click="newDialog = true">新建剧集</el-button>
@@ -44,7 +44,20 @@
       </div>
 
       <div class="panel-block">
-        <h4 class="panel-title">3 · AI 配音</h4>
+        <h4 class="panel-title">3 · 翻译本地化 <el-tag size="small" type="info">可选</el-tag></h4>
+        <StepTranslate
+          v-if="chain.works.storyboard && chain.works.storyboard.status === 'ready'"
+          :work="chain.works.translate"
+          :detail="details.translate"
+          :storyboard-work="chain.works.storyboard"
+          @create="createStepWork('translate')"
+          @generated="onGenerated('translate', $event)"
+        />
+        <el-empty v-else description="完成分镜后解锁翻译本地化" :image-size="60" />
+      </div>
+
+      <div class="panel-block">
+        <h4 class="panel-title">4 · AI 配音</h4>
         <StepAudio
           v-if="chain.works.storyboard && chain.works.storyboard.status === 'ready'"
           :work="chain.works.audio"
@@ -58,7 +71,7 @@
       </div>
 
       <div class="panel-block">
-        <h4 class="panel-title">4 · 字幕</h4>
+        <h4 class="panel-title">5 · 字幕</h4>
         <StepSubtitle
           v-if="chain.works.audio && chain.works.audio.status === 'ready'"
           :work="chain.works.subtitle"
@@ -66,18 +79,20 @@
           :audio-work="chain.works.audio"
           @create="createStepWork('subtitle')"
           @generated="onGenerated('subtitle', $event)"
+          @refresh="refreshAll"
         />
         <el-empty v-else description="完成配音后解锁字幕" :image-size="60" />
       </div>
 
       <div class="panel-block">
-        <h4 class="panel-title">5 · 成片</h4>
+        <h4 class="panel-title">6 · 成片</h4>
         <StepVideo
           v-if="chain.works.storyboard && chain.works.storyboard.status === 'ready' && chain.works.audio && chain.works.audio.status === 'ready'"
           :work="chain.works.video"
           :detail="details.video"
           :storyboard-work="chain.works.storyboard"
           :audio-work="chain.works.audio"
+          :script-work="chain.works.script"
           @create="createStepWork('video')"
           @generated="onGenerated('video', $event)"
           @refresh="refreshAll"
@@ -99,6 +114,7 @@ import { useRoute, useRouter } from 'vue-router'
 import WorkSteps from '../../components/WorkSteps.vue'
 import StepScript from './workshop/StepScript.vue'
 import StepStoryboard from './workshop/StepStoryboard.vue'
+import StepTranslate from './workshop/StepTranslate.vue'
 import StepAudio from './workshop/StepAudio.vue'
 import StepSubtitle from './workshop/StepSubtitle.vue'
 import StepVideo from './workshop/StepVideo.vue'
@@ -107,6 +123,7 @@ import { useWorkStore } from '../../stores/work.js'
 const STEP_DEFS = [
   { key: 'script', title: 'AI 剧本', desc: '题材/市场 → 分集大纲' },
   { key: 'storyboard', title: 'AI 分镜', desc: '剧本 → 镜头列表' },
+  { key: 'translate', title: '翻译本地化', desc: '台词 → 跨文化改写', optional: true },
   { key: 'audio', title: 'AI 配音', desc: '台词 → 多语种音频' },
   { key: 'subtitle', title: '字幕', desc: 'SRT 时间轴' },
   { key: 'video', title: '成片', desc: '烧字幕合成 MP4' }
@@ -115,6 +132,7 @@ const STEP_DEFS = [
 const STEP_SUFFIX = {
   script: '',
   storyboard: '-分镜',
+  translate: '-翻译',
   audio: '-配音',
   subtitle: '-字幕',
   video: '-成片'
@@ -129,7 +147,7 @@ const newDialog = ref(false)
 const newTitle = ref('')
 const chain = ref({
   base: '',
-  works: { script: null, storyboard: null, audio: null, subtitle: null, video: null }
+  works: { script: null, storyboard: null, translate: null, audio: null, subtitle: null, video: null }
 })
 const details = ref({})
 
@@ -152,6 +170,8 @@ const stepList = computed(() =>
 
 const activeIndex = computed(() => {
   const idx = STEP_DEFS.findIndex((def) => {
+    // 可选步骤未创建时不阻塞进度条
+    if (def.optional && !chain.value.works[def.key]) return false
     const work = chain.value.works[def.key]
     return !work || work.status !== 'ready'
   })
@@ -216,6 +236,7 @@ async function createChain() {
   chain.value.base = base
   chain.value.works.script = work
   chain.value.works.storyboard = null
+  chain.value.works.translate = null
   chain.value.works.audio = null
   chain.value.works.subtitle = null
   chain.value.works.video = null

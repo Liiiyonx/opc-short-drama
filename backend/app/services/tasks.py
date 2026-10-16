@@ -395,7 +395,13 @@ async def review_work(
     }
 
     declare = work.ai_declare_json or {}
-    ai_diff_ratio = declare.get("human_edit_ratio")
+    # 优先实测修改度（学生提交过人工修订产物时系统自动计算），自报值兜底
+    measured = declare.get("measured_edit_ratio")
+    declared = declare.get("human_edit_ratio")
+    ai_diff_ratio = measured if measured is not None else declared
+    edit_ratio_source = (
+        "measured" if measured is not None else ("declared" if declared is not None else None)
+    )
 
     review = WorkReview(
         work_id=work.id,
@@ -405,6 +411,7 @@ async def review_work(
             "pass_score": rubric.get("pass_score", 60),
             "passed": total >= float(rubric.get("pass_score", 60)),
             "items": detail_scores,
+            "edit_ratio_source": edit_ratio_source,
         },
         comment=body.comment,
         ai_diff_ratio=ai_diff_ratio,

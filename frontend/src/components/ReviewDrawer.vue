@@ -12,6 +12,12 @@
             </span>
             <span v-else class="muted">学生未填写 AI 使用声明</span>
           </el-descriptions-item>
+          <el-descriptions-item v-if="measuredRatio != null" label="实测修改度" :span="2">
+            <el-tag type="warning" size="small">{{ Math.round(measuredRatio * 100) }}%</el-tag>
+            <span class="muted" style="margin-left: 8px">
+              系统比对「学生修订版 vs AI 原版」自动计算（字幕校轴等），与自报值可交叉核验
+            </span>
+          </el-descriptions-item>
         </el-descriptions>
 
         <el-divider content-position="left">作品产物</el-divider>
@@ -57,7 +63,7 @@ import { ElMessage } from 'element-plus'
 import AssetCard from './AssetCard.vue'
 import { getWork, getWorkReview, reviewWork } from '../api/index.js'
 
-const TYPE_LABELS = { script: '剧本', storyboard: '分镜', audio: '配音', subtitle: '字幕', video: '成片' }
+const TYPE_LABELS = { script: '剧本', storyboard: '分镜', translate: '翻译本地化', audio: '配音', subtitle: '字幕', video: '成片' }
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -81,6 +87,11 @@ const scores = ref({})
 const lastResult = ref(null)
 
 const criteria = computed(() => (props.rubric && props.rubric.criteria) || [])
+
+const measuredRatio = computed(() => {
+  const value = declare.value && declare.value.measured_edit_ratio
+  return value === undefined || value === null ? null : value
+})
 
 function normalizedWeight(criterion) {
   const totalWeight = criteria.value.reduce((sum, item) => sum + Number(item.weight || 0), 0) || 1

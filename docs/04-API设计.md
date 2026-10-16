@@ -49,7 +49,9 @@
 | POST | /works | 创建作品 `{title, type, task_id?}`，初始 draft |
 | GET | /works | 我的作品列表（type 过滤、分页） |
 | GET | /works/{id} | 详情：作品 + 资产（含 URL）+ 子版本链 |
-| POST | /works/{id}/generate | 生成 / 重生成。script：剧本参数；storyboard：`{source_work_id, episode}`；audio：`{storyboard_work_id, lang?, voice_map?}`（异步）；subtitle：`{audio_work_id}`（同步复制 SRT）；video：`{storyboard_work_id, audio_work_id}`（异步）。首次生成原地升级 draft→ready，再次生成创建 parent 链新版本（异步类型不建版本链，P1 项） |
+| POST | /works/{id}/generate | 生成 / 重生成。script：剧本参数；storyboard：`{source_work_id, episode}`；translate：`{storyboard_work_id, target_locale?}`（同步，本地化+合规标记）；audio：`{storyboard_work_id, lang?, voice_map?}`（异步）；subtitle：`{audio_work_id}`（同步复制 SRT）；video：`{storyboard_work_id, audio_work_id}`（异步）。首次生成原地升级 draft→ready，再次生成创建 parent 链新版本（异步类型不建版本链，P1 项） |
+| POST | /works/{id}/publish-params | 成片 → 发布参数包 `{source_work_id?, platforms?}`（publish Agent，产物落 publish_params 资产） |
+| POST | /works/{id}/revision | 提交人工修订产物 `{kind: srt/text, content}` → 自动计算与 AI 原版差异度（实测修改度，写入 AI 声明，供批改页核验） |
 | POST | /works/{id}/assets | multipart 上传文件资产（file + kind） |
 | POST | /works/{id}/text-assets | 登记文本资产 `{kind: text/json/srt, content}` |
 | GET | /works/{id}/assets | 资产列表（含访问 URL） |
@@ -94,7 +96,7 @@
 
 > 命名说明：异步轮询原定 `/tasks/{id}`，因与 §3.4 教学任务路由冲突，W6 起重命名为 `/agent-tasks/{id}`。
 >
-> 异步智能体（tts / compose）经作品 generate 入口入队后返回 `session_id`，
+> 异步智能体（tts / compose）经作品 generate 入口入队后返回 `session_id`，（当前已实现 6 个智能体：剧本/分镜/翻译本地化/配音/成片合成/发布参数）
 > 由 arq worker（`python -m arq app.workers.tasks.WorkerSettings`）执行，
 > 前端轮询 `GET /agent-tasks/{session_id}`：running → success / failed。P1 升级 SSE。
 >

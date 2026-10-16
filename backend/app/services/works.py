@@ -5,7 +5,9 @@
 - 文件全部走 Storage 抽象，库内只存 storage_key；
 - 所有操作校验归属（本人或管理员）。
 """
+import difflib
 import json
+import re
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -14,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.orchestrator import invoke_agent
 from app.models.user import User
 from app.models.work import WORK_TYPES, Work, WorkAsset
-from app.schemas.work import GenerateIn
+from app.schemas.work import GenerateIn, PublishParamsIn, RevisionIn
 from app.services.storage.base import generate_key
 from app.services.storage.factory import get_storage
 from app.services.tts.voices import market_to_lang
@@ -123,6 +125,13 @@ def _meta_for(work: Work, result: dict, body: GenerateIn) -> dict:
             "target_market": data.get("target_market"),
             "episodes": len(data.get("episodes", [])),
         }
+    if work.type == "translate":
+        return {
+            "lines": len(data.get("lines", [])),
+            "notes": len(data.get("notes", [])),
+            "flags": len(data.get("compliance_flags", [])),
+            "target_locale": data.get("target_locale"),
+        }
     return {
         "source_work_id": body.source_work_id,
         "episode": body.episode or 1,
@@ -197,6 +206,53 @@ async def generate(
             "target_seconds": body.target_seconds or 120,
         }
         agent_type = "storyboard"
+    elif work.type == "translate":
+        # 从分镜作品提取台词 → 翻译本地化（同步；含合规标记）
+        if body.storyboard_work_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": 40001,
+                    "message": "翻译生成需要 storyboard_work_id（分镜作品 id）",
+                },
+            )
+        storyboard = await _load_my_work(db, user, body.storyboard_work_id)
+        if storyboard.type != "storyboard":
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 40001, "message": "storyboard_work_id 必须是分镜作品"},
+            )
+        shots_data = await _latest_json_asset(db, storyboard.id)
+        if not shots_data or not shots_data.get("shots"):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": 40901, "message": "分镜作品没有产物，请先执行分镜生成"},
+            )
+        # 目标市场沿链回溯剧本作品（分镜 meta 不存市场）
+        target_market = None
+        source_id = (storyboard.meta_json or {}).get("source_work_id")
+        if source_id:
+            script_work = await _load_my_work(db, user, source_id)
+            target_market = (script_work.meta_json or {}).get("target_market")
+        lines = [
+            {
+                "line_id": shot.get("shot_no", index + 1),
+                "text": shot["dialogue"],
+                "role": "narrator",
+            }
+            for index, shot in enumerate(shots_data["shots"])
+            if shot.get("dialogue")
+        ]
+        if not lines:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 40001, "message": "分镜中没有台词，无法翻译"},
+            )
+        payload = {
+            "lines": lines,
+            "target_locale": body.target_locale or market_to_lang(target_market),
+        }
+        agent_type = "translate"
     elif work.type == "audio":
         # 从分镜作品提取台词行 → 配音（异步）
         if body.storyboard_work_id is None:
@@ -321,6 +377,95 @@ async def generate(
     await db.commit()
     await db.refresh(target)
     return target, result
+
+
+_TITLE_SUFFIX_RE = re.compile(r"\s*[-—]\s*(成片|视频)$")
+
+
+async def generate_publish_params(
+    db: AsyncSession, user: User, work_id: int, body: PublishParamsIn
+) -> tuple[Work, dict]:
+    """成片 → 各平台上架参数（publish Agent；产物落 publish_params 资产）。"""
+    work = await _load_my_work(db, user, work_id)
+    if work.type != "video":
+        raise HTTPException(
+            status_code=409,
+            detail={"code": 40901, "message": "只有成片作品可以生成发布参数"},
+        )
+    if work.status != "ready":
+        raise HTTPException(
+            status_code=409,
+            detail={"code": 40901, "message": "成片尚未合成完成，无法生成发布参数"},
+        )
+    meta = work.meta_json or {}
+    payload: dict = {
+        "title": _TITLE_SUFFIX_RE.sub("", work.title).strip() or work.title,
+        "target_market": "北美",
+        "duration_seconds": round((meta.get("duration_ms") or 0) / 1000, 1),
+    }
+    if body.source_work_id is not None:
+        script_work = await _load_my_work(db, user, body.source_work_id)
+        script_meta = script_work.meta_json or {}
+        if script_meta.get("target_market"):
+            payload["target_market"] = script_meta["target_market"]
+        outline = await _latest_json_asset(db, script_work.id)
+        if outline:
+            if outline.get("title"):
+                payload["title"] = outline["title"]
+            if outline.get("logline"):
+                payload["synopsis"] = outline["logline"]
+    if body.platforms:
+        payload["platforms"] = body.platforms
+    result = await invoke_agent("publish", payload, user=user, db=db, work_id=work.id)
+    return work, result
+
+
+async def submit_revision(
+    db: AsyncSession, user: User, work_id: int, body: RevisionIn
+) -> dict:
+    """学生提交人工修订产物（字幕校轴等）；自动计算与 AI 原版的差异度。
+
+    教学红线"AI 辅助而非替代"的量化落点：实测修改度写入
+    ai_declare_json.measured_edit_ratio，与自报 human_edit_ratio 并列供教师核对。
+    """
+    work = await _load_my_work(db, user, work_id)
+    if body.kind == "srt":
+        baseline = await latest_asset(db, work.id, "srt")
+        if baseline is None:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": 40901, "message": "该作品还没有 SRT 产物，无法比对"},
+            )
+        baseline_text = get_storage().get_bytes(baseline.storage_key).decode("utf-8")
+    else:
+        baseline_json = await _latest_json_asset(db, work.id)
+        if baseline_json is None:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": 40901, "message": "该作品还没有文本产物，无法比对"},
+            )
+        baseline_text = json.dumps(baseline_json, ensure_ascii=False)
+
+    similarity = difflib.SequenceMatcher(None, baseline_text, body.content).ratio()
+    edit_ratio = round(1 - similarity, 4)
+    await save_asset(
+        db,
+        work.id,
+        f"{body.kind}_revised",
+        body.content.encode("utf-8"),
+        "text/plain",
+    )
+    declare = dict(work.ai_declare_json or {})
+    declare["measured_edit_ratio"] = edit_ratio
+    work.ai_declare_json = declare
+    await db.commit()
+    await db.refresh(work)
+    return {
+        "work_id": work.id,
+        "baseline_kind": body.kind,
+        "similarity": round(similarity, 4),
+        "measured_edit_ratio": edit_ratio,
+    }
 
 
 async def add_file_asset(

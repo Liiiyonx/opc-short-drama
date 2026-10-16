@@ -24,7 +24,7 @@ from app.db.types import JSONType
 # 同 models/user.py：SQLite 渲染 INTEGER 以启用 rowid 自增
 from app.models.user import PK_BIGINT  # noqa: F401  （供迁移引用一致性）
 
-WORK_TYPES = ("script", "storyboard", "audio", "subtitle", "video")
+WORK_TYPES = ("script", "storyboard", "translate", "audio", "subtitle", "video")
 WORK_STATUS = ("draft", "generating", "ready", "failed")
 
 

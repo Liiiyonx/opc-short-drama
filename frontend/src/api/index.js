@@ -103,6 +103,14 @@ export function submitAiDeclare(id, payload) {
   return http.post(`/works/${id}/ai-declare`, payload)
 }
 
+export function createPublishParams(id, payload) {
+  return http.post(`/works/${id}/publish-params`, payload)
+}
+
+export function submitRevision(id, payload) {
+  return http.post(`/works/${id}/revision`, payload)
+}
+
 // ---------- 异步任务 ----------
 export function getTask(taskId) {
   return http.get(`/agent-tasks/${taskId}`)

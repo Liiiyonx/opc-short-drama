@@ -2,7 +2,12 @@
 
 路由表按 agent_type 选择 (model, temperature, max_tokens)；
 模型名可被环境变量 LLM_MODEL_<AGENT> 覆盖，未覆盖则用 LLM_MODEL_DEFAULT。
-价格表为估算用，单位「元 / 百万 tokens」，以官网实时价格为准修改。
+
+模型名与价格核价说明（2026-10-16 联网核实，api-docs.deepseek.com）：
+- deepseek-chat / deepseek-reasoner 官方已弃用（2026-07-24），兼容映射到
+  deepseek-v4-flash（非思考 / 思考模式）；新代码直接用 deepseek-v4-flash；
+- 实测（2026-10-16）两者均返回 model=deepseek-flash，价格同 flash；
+- 价格表单位「元 / 百万 tokens」，按官方 USD 价 × 7.1 折算（估算用）。
 """
 from dataclasses import dataclass, replace
 
@@ -17,21 +22,27 @@ class ModelRoute:
 
 
 DEFAULT_ROUTES: dict[str, ModelRoute] = {
-    # script/storyboard 输出体积大（多集大纲/多镜头列表），max_tokens 拉满
-    # 防截断；截断的 JSON 会被修复重试救场但会浪费一轮调用。
-    "script": ModelRoute("deepseek-chat", 0.8, 8192),
-    "storyboard": ModelRoute("deepseek-chat", 0.7, 8192),
-    "translate": ModelRoute("deepseek-chat", 0.3, 4096),
-    "analyze": ModelRoute("deepseek-chat", 0.2, 2048),
-    "optimize": ModelRoute("deepseek-chat", 0.5, 2048),
-    "match": ModelRoute("deepseek-chat", 0.2, 2048),
+    # script/storyboard/translate 输出体积大，max_tokens 拉满防截断；
+    # 截断的 JSON 会被修复重试救场但会浪费一轮调用。
+    "script": ModelRoute("deepseek-v4-flash", 0.8, 8192),
+    "storyboard": ModelRoute("deepseek-v4-flash", 0.7, 8192),
+    "translate": ModelRoute("deepseek-v4-flash", 0.3, 8192),
+    "publish": ModelRoute("deepseek-v4-flash", 0.4, 2048),
+    "analyze": ModelRoute("deepseek-v4-flash", 0.2, 2048),
+    "optimize": ModelRoute("deepseek-v4-flash", 0.5, 2048),
+    "match": ModelRoute("deepseek-v4-flash", 0.2, 2048),
 }
 
-_FALLBACK = ModelRoute("deepseek-chat", 0.7, 2048)
+_FALLBACK = ModelRoute("deepseek-v4-flash", 0.7, 2048)
 
-# 元 / 百万 tokens（估算用）
+# 元 / 百万 tokens（估算用；官方 USD 价 × 7.1，核价 2026-10-16）
+# flash：$0.14 输入(cache miss) / $0.28 输出；pro：$0.435 / $0.87
 PRICES_PER_MILLION: dict[str, dict[str, float]] = {
-    "deepseek-chat": {"input": 2.0, "output": 8.0},
+    "deepseek-v4-flash": {"input": 1.0, "output": 2.0},
+    "deepseek-flash": {"input": 1.0, "output": 2.0},  # 响应侧实际模型名
+    "deepseek-chat": {"input": 1.0, "output": 2.0},  # 已弃用别名 → 映射 flash
+    "deepseek-reasoner": {"input": 1.0, "output": 2.0},  # 已弃用别名 → flash 思考模式
+    "deepseek-v4-pro": {"input": 3.1, "output": 6.2},
 }
 
 

@@ -3,15 +3,19 @@ from fastapi import HTTPException
 
 from app.agents.base import Agent
 from app.agents.compose_agent import ComposeAgent
+from app.agents.publish_agent import PublishAgent
 from app.agents.script_agent import ScriptAgent
 from app.agents.storyboard_agent import StoryboardAgent
+from app.agents.translate_agent import TranslateAgent
 from app.agents.tts_agent import TTSAgent
 
 AGENTS: dict[str, type[Agent]] = {
     "script": ScriptAgent,
     "storyboard": StoryboardAgent,
+    "translate": TranslateAgent,
     "tts": TTSAgent,
     "compose": ComposeAgent,
+    "publish": PublishAgent,
 }
 
 
