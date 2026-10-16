@@ -3,7 +3,7 @@
 > "AI 赋能 · 一人成军" —— 电子商务与商务英语双专业联动的 OPC 短剧出海产教融合创新实践
 
 - 建设单位：福州理工学院 经济贸易学院
-- 形态：**三端（学生 / 教师 / 企业）+ 一中枢（Agent Orchestrator）+ 八智能体**
+- 形态：**三端（学生 / 教师 / 企业）+ 管理后台 + 一中枢（Agent Orchestrator）+ 六智能体**
 - 核心叙事：学生一人借助智能体矩阵，独立承接短剧出海全流程商业订单（一人成军）
 - 当前阶段：**P0-MVP 全链路完成（2026-10-16）**：三端闭环（学生创作工坊 / 教师任务批改与能力快照 / 企业工单遴选）+ 智能体矩阵（剧本/分镜/翻译本地化/配音/成片合成/发布参数）+ arq 异步 + 一键部署脚本
 
@@ -22,7 +22,7 @@ OPC短剧出海AI集合智能体平台/
 │   └── 开发进度存档.md          # 每完成一部分实质工作立即追加
 ├── backend/                   # FastAPI 后端（Python 3.11+）
 │   └── app/{core,db,models,schemas,api,agents,services,workers}
-├── frontend/                  # Vue 3 + Element Plus 三端前端
+├── frontend/                  # Vue 3 + Element Plus 前端（三端 + 管理后台）
 ├── docs/演示脚本.md            # 15 分钟全流程演示脚本（三端四智能体）
 ├── deploy.sh                  # 一键部署（docker compose 全栈）
 ├── docker-compose.yml         # nginx + api + worker + mysql + redis + minio

@@ -14,6 +14,12 @@ class UserCreate(BaseModel):
     phone: str | None = Field(default=None, max_length=20)
 
 
+class UserStatusIn(BaseModel):
+    """管理员启用 / 禁用用户（1=启用，0=禁用）。"""
+
+    status: int = Field(ge=0, le=1)
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

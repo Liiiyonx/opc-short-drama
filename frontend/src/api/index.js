@@ -72,6 +72,23 @@ export function getMe() {
   return http.get('/users/me')
 }
 
+// ---------- 管理后台（admin） ----------
+export function listUsers(params) {
+  return http.get('/users', { params })
+}
+
+export function createUser(payload) {
+  return http.post('/users', payload)
+}
+
+export function updateUserStatus(userId, payload) {
+  return http.patch(`/users/${userId}/status`, payload)
+}
+
+export function createCourse(payload) {
+  return http.post('/courses', payload)
+}
+
 // ---------- 作品 ----------
 export function listWorks(params) {
   return http.get('/works', { params })
