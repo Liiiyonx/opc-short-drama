@@ -88,11 +88,25 @@ async def test_script_agent_full_chain(db):
 
 
 async def test_quota_exceeded(db, monkeypatch, reset_settings):
+    """配额超限 → 429。mock 桩不计入配额（2026-10-16 修复），故注入真实调用记录。"""
+    from datetime import datetime
+
+    from app.models.agent import AgentCallLog
+
     monkeypatch.setenv("QUOTA_TEXT_CALLS_PER_USER_DAY", "1")
     get_settings.cache_clear()
     user = (await db.execute(select(User).where(User.username == "tester"))).scalar_one()
+    db.add(
+        AgentCallLog(
+            user_id=user.id,
+            agent_type="script",
+            provider="openai_compat",
+            status="success",
+            created_at=datetime.now(),
+        )
+    )
+    await db.commit()
 
-    await invoke_agent("script", dict(SCRIPT_PAYLOAD), user=user, db=db)
     with pytest.raises(HTTPException) as exc_info:
         await invoke_agent("script", dict(SCRIPT_PAYLOAD), user=user, db=db)
     assert exc_info.value.status_code == 429

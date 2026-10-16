@@ -2,7 +2,9 @@ import axios from 'axios'
 
 const http = axios.create({
   baseURL: '/api/v1',
-  timeout: 30000
+  // 真实 AI 调用（剧本/分镜/翻译/发布参数）为同步接口，耗时 5-30s，
+  // 叠加 JSON 修复重试可能翻倍——30s 会误报超时（mock 模式 <1s 故不易暴露）。
+  timeout: 120000
 })
 
 http.interceptors.request.use((config) => {
