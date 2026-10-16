@@ -11,7 +11,9 @@ from app.core.config import get_settings
 from app.models.agent import AgentCallLog
 
 TEXT_AGENTS = {"script", "storyboard", "translate", "analyze", "optimize", "match"}
-MEDIA_AGENTS = {"tts", "publish"}
+# 媒体类（全部走媒体配额）：配音、成片合成、发布参数生成
+# 修复记录：compose 曾遗漏在集合外，导致最贵的媒体操作绕过配额（2026-10-16）
+MEDIA_AGENTS = {"tts", "compose", "publish"}
 
 
 class QuotaExceeded(Exception):
@@ -32,6 +34,8 @@ async def count_today_calls(db: AsyncSession, user_id: int, agent_types: set[str
             AgentCallLog.user_id == user_id,
             AgentCallLog.created_at >= _today_start(),
             AgentCallLog.agent_type.in_(sorted(agent_types)),
+            # 测试桩（mock 模式）不占用户配额：本地反复联调/彩排不应被限流
+            AgentCallLog.provider != "mock",
         )
     )
     return int(result.scalar_one())
