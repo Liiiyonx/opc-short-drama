@@ -14,6 +14,7 @@ from app.api.v1 import (
     auth,
     courses,
     files,
+    orders,
     tasks,
     users,
     works,
@@ -62,6 +63,7 @@ app.include_router(agent_tasks.router, prefix="/api/v1")
 app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(ability.router, prefix="/api/v1")
 app.include_router(courses.router, prefix="/api/v1")
+app.include_router(orders.router, prefix="/api/v1")
 
 
 @app.get("/health")

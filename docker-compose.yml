@@ -1,6 +1,7 @@
-# 开发配套基础设施（MySQL / Redis / MinIO）
-# 用法：docker compose up -d
-# 应用服务（api / worker / web）的 dev/prod 编排在第 1 周与第 8 周分别补齐。
+# 生产编排：nginx(web) + api + worker + mysql + redis + minio
+# 用法：
+#   cp .env.example .env  # 填 LLM_API_KEY 等
+#   bash deploy.sh        # 或手动 docker compose up -d --build
 services:
   mysql:
     image: mysql:8.0
@@ -39,6 +40,60 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+
+  api:
+    build: ./backend
+    container_name: opc-api
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: mysql+aiomysql://opc:opc@mysql:3306/opc?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/1
+      STORAGE_BACKEND: minio
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: opcadmin
+      MINIO_SECRET_KEY: opcadmin123
+      MINIO_BUCKET: opc
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    container_name: opc-worker
+    command: python -m arq app.workers.tasks.WorkerSettings
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: mysql+aiomysql://opc:opc@mysql:3306/opc?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/1
+      STORAGE_BACKEND: minio
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: opcadmin
+      MINIO_SECRET_KEY: opcadmin123
+      MINIO_BUCKET: opc
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    container_name: opc-web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+    restart: unless-stopped
 
 volumes:
   mysql_data:

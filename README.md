@@ -5,7 +5,7 @@
 - 建设单位：福州理工学院 经济贸易学院
 - 形态：**三端（学生 / 教师 / 企业）+ 一中枢（Agent Orchestrator）+ 八智能体**
 - 核心叙事：学生一人借助智能体矩阵，独立承接短剧出海全流程商业订单（一人成军）
-- 当前阶段：**P0-MVP 策划定稿（2026-10-16）**，工程骨架已初始化，下一步进入第 1 周实码
+- 当前阶段：**P0-MVP 全链路完成（2026-10-16）**：三端闭环（学生创作工坊 / 教师任务批改与能力快照 / 企业工单遴选）+ 四智能体（剧本/分镜/配音/成片合成）+ arq 异步 + 一键部署脚本
 
 ## 目录结构
 
@@ -23,8 +23,9 @@ OPC短剧出海AI集合智能体平台/
 ├── backend/                   # FastAPI 后端（Python 3.11+）
 │   └── app/{core,db,models,schemas,api,agents,services,workers}
 ├── frontend/                  # Vue 3 + Element Plus 三端前端
-├── deploy/                    # nginx、部署脚本（第 8 周补齐）
-├── docker-compose.yml         # 本地开发配套基础设施（MySQL/Redis/MinIO）
+├── docs/演示脚本.md            # 15 分钟全流程演示脚本（三端四智能体）
+├── deploy.sh                  # 一键部署（docker compose 全栈）
+├── docker-compose.yml         # nginx + api + worker + mysql + redis + minio
 └── .env.example               # 配置模板（不含任何真实密钥）
 ```
 
@@ -36,6 +37,8 @@ cd backend
 python -m venv .venv && source .venv/Scripts/activate   # Windows Git Bash
 pip install -r requirements.txt
 cp ../.env.example .env        # 按需修改；密钥见下方规约
+python -m alembic upgrade head # 初始化数据库
+python -m scripts.seed         # 演示数据（幂等）
 uvicorn app.main:app --reload --port 8000
 
 # 异步任务 worker（配音/成片合成走 arq + Redis，需另开终端；依赖 Redis 与 ffmpeg）

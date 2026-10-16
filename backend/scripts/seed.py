@@ -1,4 +1,4 @@
-"""演示数据种子：四角色账号 + 一门课程 + 一个班级。
+"""演示数据种子：四角色账号 + 课程 + 实训任务 + 工单。
 
 用法（在 backend/ 目录）：
     python -m scripts.seed
@@ -17,12 +17,15 @@ from sqlalchemy import select
 from app.core.security import hash_password
 from app.db.session import AsyncSessionLocal
 from app.models.course import Course, CourseClass
+from app.models.order import WorkOrder
 from app.models.profile import (
     EnterpriseProfile,
     StudentProfile,
     TeacherProfile,
 )
+from app.models.task import TrainingTask
 from app.models.user import User
+from app.services.tasks import DEFAULT_RUBRIC
 
 USERS = [
     ("admin", "admin123", "admin", None),
@@ -34,6 +37,7 @@ USERS = [
 
 COURSE_CODE = "CROSS201"
 COURSE_NAME = "AIGC跨境内容创作"
+DEMO_TASK_TITLE = "示范任务：短剧出海全流程实战"
 
 
 async def seed() -> None:
@@ -100,6 +104,58 @@ async def seed() -> None:
                     )
                 )
                 print(f"created course {COURSE_CODE} {COURSE_NAME}")
+
+            # 演示任务（published，含默认五项 Rubric）
+            task = (
+                await db.execute(
+                    select(TrainingTask).where(TrainingTask.title == DEMO_TASK_TITLE)
+                )
+            ).scalar_one_or_none()
+            if task is None:
+                db.add(
+                    TrainingTask(
+                        course_id=course.id,
+                        title=DEMO_TASK_TITLE,
+                        brief="组队完成一部 2 集短剧出海全流程（剧本→分镜→配音→字幕→成片）并提交成片，教师按 Rubric 批改并更新五维能力。",
+                        rubric_json=DEFAULT_RUBRIC,
+                        team_rule="free",
+                        deliverable_json={"items": ["成片 MP4", "字幕 SRT", "AI 使用声明"]},
+                        status="published",
+                        creator_id=teacher.id,
+                    )
+                )
+                print(f"created demo task: {DEMO_TASK_TITLE}")
+
+            # 演示工单（published，学生可直接投标）
+            enterprise = (
+                await db.execute(select(User).where(User.role == "enterprise"))
+            ).scalars().first()
+            if enterprise is not None:
+                order = (
+                    await db.execute(
+                        select(WorkOrder).where(
+                            WorkOrder.title == "演示工单：出海短剧《都市逆袭》定制"
+                        )
+                    )
+                ).scalar_one_or_none()
+                if order is None:
+                    db.add(
+                        WorkOrder(
+                            enterprise_id=enterprise.id,
+                            title="演示工单：出海短剧《都市逆袭》定制",
+                            requirements_json={
+                                "genre": "逆袭",
+                                "market": "北美",
+                                "episodes": 6,
+                                "lang": "en-US",
+                                "delivery": "成片 MP4 + 字幕 + 发布参数包",
+                            },
+                            budget_cents=300000,
+                            status="published",
+                            verify_note="演示数据：需求清晰，通过",
+                        )
+                    )
+                    print("created demo order")
         await db.commit()
     print("seed done")
 

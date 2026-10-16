@@ -155,4 +155,33 @@ export function listCourses() {
   return http.get('/courses')
 }
 
+// ---------- 工单 ----------
+export function listOrders() {
+  return http.get('/orders')
+}
+
+export function createOrder(payload) {
+  return http.post('/orders', payload)
+}
+
+export function getOrder(orderId) {
+  return http.get(`/orders/${orderId}`)
+}
+
+export function verifyOrder(orderId, payload) {
+  return http.post(`/orders/${orderId}/verify`, payload)
+}
+
+export function bidOrder(orderId, payload) {
+  return http.post(`/orders/${orderId}/bid`, payload)
+}
+
+export function listBids(orderId) {
+  return http.get(`/orders/${orderId}/bids`)
+}
+
+export function awardOrder(orderId, bidId) {
+  return http.post(`/orders/${orderId}/award`, { bid_id: bidId })
+}
+
 export default http

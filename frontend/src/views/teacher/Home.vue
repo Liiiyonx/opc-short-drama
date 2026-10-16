@@ -11,6 +11,25 @@
       </div>
     </div>
 
+    <el-card v-if="pendingOrders.length" shadow="never" class="pending-card">
+      <template #header>待审核工单（{{ pendingOrders.length }}）</template>
+      <el-table :data="pendingOrders" size="small">
+        <el-table-column prop="title" label="工单" min-width="180" show-overflow-tooltip />
+        <el-table-column label="预算" width="100">
+          <template #default="{ row }">{{ (row.budget_cents / 100).toFixed(0) }} 元</template>
+        </el-table-column>
+        <el-table-column label="提交时间" width="160">
+          <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="170">
+          <template #default="{ row }">
+            <el-button size="small" type="success" @click="verifyOrderRow(row, true)">通过</el-button>
+            <el-button size="small" type="danger" @click="verifyOrderRow(row, false)">驳回</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <el-card shadow="never">
       <template #header>
         <span>我的任务</span>
@@ -106,7 +125,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { closeTask, createTask, listCourses, listTasks } from '../../api/index.js'
+import { closeTask, createTask, listCourses, listOrders, listTasks, verifyOrder } from '../../api/index.js'
 import { useUserStore } from '../../stores/user.js'
 
 const DIMENSIONS = ['内容创作', '跨文化沟通', '电商运营', 'AI工具应用', '数据分析']
@@ -126,6 +145,7 @@ const username = computed(() => (userStore.profile ? userStore.profile.username 
 
 const tasks = ref([])
 const courses = ref([])
+const orders = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const formVisible = ref(false)
@@ -153,6 +173,10 @@ function addCriterion() {
   })
 }
 
+const pendingOrders = computed(() =>
+  orders.value.filter((order) => order.status === 'pending_review')
+)
+
 async function reload() {
   loading.value = true
   try {
@@ -160,10 +184,32 @@ async function reload() {
     tasks.value = data.items
     const courseData = await listCourses()
     courses.value = courseData.items
+    const orderData = await listOrders()
+    orders.value = orderData.items
   } catch (error) {
     ElMessage.error(error.message || '加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function verifyOrderRow(row, approved) {
+  try {
+    if (!approved) {
+      const { value } = await ElMessageBox.prompt('请填写驳回意见', '驳回工单', {
+        inputPlaceholder: '如：需求描述不完整，请补充交付标准'
+      })
+      await verifyOrder(row.id, { approved: false, note: value })
+    } else {
+      await ElMessageBox.confirm(`确认通过工单「${row.title}」？通过后学生可见并投标。`, '审核通过', { type: 'warning' })
+      await verifyOrder(row.id, { approved: true, note: '需求清晰，通过' })
+    }
+    ElMessage.success(approved ? '已通过' : '已驳回')
+    await reload()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '操作失败')
+    }
   }
 }
 
@@ -257,5 +303,8 @@ onMounted(async () => {
 .pass-score {
   font-size: 13px;
   color: var(--el-text-color-secondary);
+}
+.pending-card {
+  margin-bottom: 14px;
 }
 </style>

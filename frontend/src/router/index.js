@@ -17,6 +17,12 @@ const routes = [
     meta: { role: 'student' }
   },
   {
+    path: '/student/orders',
+    name: 'student-orders',
+    component: () => import('../views/student/Orders.vue'),
+    meta: { role: 'student' }
+  },
+  {
     path: '/student/workshop',
     name: 'workshop',
     component: () => import('../views/student/Workshop.vue'),
@@ -43,9 +49,8 @@ const routes = [
   {
     path: '/enterprise',
     name: 'enterprise-home',
-    component: () => import('../views/common/Placeholder.vue'),
-    meta: { role: 'enterprise' },
-    props: { title: '企业端', note: '工单发布 / 作品集市 / 遴选买单，第 7 周上线' }
+    component: () => import('../views/enterprise/Home.vue'),
+    meta: { role: 'enterprise' }
   }
 ]
 

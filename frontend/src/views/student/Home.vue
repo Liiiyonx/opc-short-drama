@@ -6,6 +6,7 @@
         <span class="sub">{{ greeting }}</span>
       </div>
       <div class="actions">
+        <el-button @click="router.push('/student/orders')">工单大厅</el-button>
         <el-button type="primary" @click="newDialog = true">新建剧集</el-button>
         <el-button text @click="logout">退出登录</el-button>
       </div>
