@@ -3,9 +3,11 @@ from fastapi import HTTPException
 
 from app.agents.base import Agent
 from app.agents.script_agent import ScriptAgent
+from app.agents.storyboard_agent import StoryboardAgent
 
 AGENTS: dict[str, type[Agent]] = {
     "script": ScriptAgent,
+    "storyboard": StoryboardAgent,
 }
 
 

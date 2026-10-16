@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import agents, auth, users
+from app.api.v1 import agents, auth, files, users, works
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -46,6 +46,8 @@ async def unified_http_exception_handler(request, exc: HTTPException):
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
+app.include_router(works.router, prefix="/api/v1")
+app.include_router(files.router, prefix="/api/v1")
 
 
 @app.get("/health")

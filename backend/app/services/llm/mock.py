@@ -45,16 +45,54 @@ MOCK_SCRIPT_OUTPUT = {
 }
 
 
-def mock_reply(route: ModelRoute):
+MOCK_STORYBOARD_OUTPUT = {
+    "shots": [
+        {
+            "shot_no": 1,
+            "scene": 1,
+            "shot_size": "特写",
+            "camera_move": "固定",
+            "visual_prompt": "close-up of a delivery rider's scarred hand reaching for a paper bag in a dim corridor, warm tungsten light, realistic style",
+            "dialogue": "你的餐。",
+            "duration_sec": 8,
+        },
+        {
+            "shot_no": 2,
+            "scene": 1,
+            "shot_size": "近景",
+            "camera_move": "推",
+            "visual_prompt": "medium shot of a mysterious customer half-hidden behind a door crack, only one hand visible, suspenseful lighting",
+            "dialogue": "放地上，别过来。",
+            "duration_sec": 10,
+        },
+        {
+            "shot_no": 3,
+            "scene": 1,
+            "shot_size": "中景",
+            "camera_move": "摇",
+            "visual_prompt": "rider looking back confused while walking away in an old residential stairwell, morning haze through window",
+            "dialogue": "",
+            "duration_sec": 12,
+        },
+    ]
+}
+
+
+def mock_reply(route: ModelRoute, agent_type: str):
     from app.services.llm.client import LLMReply
 
-    content = json.dumps(MOCK_SCRIPT_OUTPUT, ensure_ascii=False)
+    if agent_type == "storyboard":
+        content = json.dumps(MOCK_STORYBOARD_OUTPUT, ensure_ascii=False)
+        prompt_tokens, completion_tokens = 96, 288
+    else:
+        content = json.dumps(MOCK_SCRIPT_OUTPUT, ensure_ascii=False)
+        prompt_tokens, completion_tokens = 128, 396
     return LLMReply(
         content=content,
         usage={
             "provider": "mock",
             "model": route.model,
-            "prompt_tokens": 128,
-            "completion_tokens": 396,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
         },
     )

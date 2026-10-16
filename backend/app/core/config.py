@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     # Redis（arq 任务队列）
     redis_url: str = "redis://127.0.0.1:6379/0"
 
-    # JWT
-    jwt_secret: str = "change-me-in-production"
+    # JWT（开发默认值仅限本地；生产必须在环境变量注入强随机密钥）
+    jwt_secret: str = "opc-dev-secret-change-me-in-production-2026"
     jwt_access_expire_minutes: int = 120
     jwt_refresh_expire_days: int = 7
 

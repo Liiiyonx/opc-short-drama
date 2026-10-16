@@ -43,16 +43,18 @@
 | POST | /works/{id}/pipeline/run | 触发流水线某一步 `{step}`（脚本/分镜/配音/字幕/成片） |
 | GET | /works/{id}/pipeline | 查询工坊各步骤状态与产物版本 |
 
-### 3.3 作品
+### 3.3 作品与资产（W3 已实现）
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | /works | 创建作品（空稿，进入流水线） |
-| GET | /works/{id} | 作品详情 + 版本链 + 资产列表 |
-| GET | /works | 列表：owner / type / task_id 过滤 |
-| POST | /works/{id}/versions | 基于某版本生成新版本（单步重跑入口） |
-| POST | /works/{id}/assets | 上传 / 登记资产（人工上传素材） |
-| GET | /works/{id}/assets/{asset_id}/url | 取存储预签名 URL |
-| POST | /works/{id}/ai-declare | 提交 / 更新 AI 使用声明 |
+| POST | /works | 创建作品 `{title, type, task_id?}`，初始 draft |
+| GET | /works | 我的作品列表（type 过滤、分页） |
+| GET | /works/{id} | 详情：作品 + 资产（含 URL）+ 子版本链 |
+| POST | /works/{id}/generate | 生成 / 重生成。script：传剧本参数；storyboard：传 `{source_work_id, episode}`。首次生成原地升级 draft→ready，再次生成创建 parent 链新版本 |
+| POST | /works/{id}/assets | multipart 上传文件资产（file + kind） |
+| POST | /works/{id}/text-assets | 登记文本资产 `{kind: text/json/srt, content}` |
+| GET | /works/{id}/assets | 资产列表（含访问 URL） |
+| POST | /works/{id}/ai-declare | 提交 AI 使用声明 `{agents_used, human_edit_ratio, note}` |
+| GET | /files/{key} | 流式读取存储文件（需登录；local 后端读盘，minio 代理下载） |
 
 ### 3.4 实训任务与批改
 | 方法 | 路径 | 说明 |
