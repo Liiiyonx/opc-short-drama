@@ -1,0 +1,58 @@
+"""应用配置。
+
+密钥规约：LLM_API_KEY 等敏感项不写进本文件与仓库，
+统一由项目外 secrets 文件通过环境变量注入（见 README 开发规约）。
+"""
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    app_name: str = "OPC短剧出海AI集合智能体平台"
+    debug: bool = False
+
+    # 数据库：开发 sqlite，生产 mysql
+    database_url: str = "sqlite+aiosqlite:///./dev.db"
+
+    # Redis（arq 任务队列）
+    redis_url: str = "redis://127.0.0.1:6379/0"
+
+    # JWT
+    jwt_secret: str = "change-me-in-production"
+    jwt_access_expire_minutes: int = 120
+    jwt_refresh_expire_days: int = 7
+
+    # LLM 多模型网关（OpenAI 兼容；默认云端 DeepSeek）
+    llm_base_url: str = "https://api.deepseek.com"
+    llm_api_key: str = ""
+    llm_model_default: str = "deepseek-chat"
+    llm_model_script: str = ""
+    llm_model_storyboard: str = ""
+    llm_model_translate: str = ""
+
+    # TTS
+    tts_provider: str = "edge-tts"
+
+    # 对象存储：local / minio
+    storage_backend: str = "local"
+    local_storage_path: str = "./storage"
+    minio_endpoint: str = "127.0.0.1:9000"
+    minio_access_key: str = "opcadmin"
+    minio_secret_key: str = "opcadmin123"
+    minio_bucket: str = "opc"
+    minio_secure: bool = False
+
+    # 媒体合成
+    ffmpeg_path: str = "ffmpeg"
+
+    # 智能体配额
+    quota_text_calls_per_user_day: int = 50
+    quota_media_calls_per_user_day: int = 10
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

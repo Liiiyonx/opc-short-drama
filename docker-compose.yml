@@ -1,0 +1,45 @@
+# 开发配套基础设施（MySQL / Redis / MinIO）
+# 用法：docker compose up -d
+# 应用服务（api / worker / web）的 dev/prod 编排在第 1 周与第 8 周分别补齐。
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: opc-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: opcroot
+      MYSQL_DATABASE: opc
+      MYSQL_USER: opc
+      MYSQL_PASSWORD: opc
+    command: --default-authentication-plugin=mysql_native_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: opc-redis
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    container_name: opc-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: opcadmin
+      MINIO_ROOT_PASSWORD: opcadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  mysql_data:
+  minio_data:
