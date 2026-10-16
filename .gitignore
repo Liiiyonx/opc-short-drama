@@ -32,3 +32,6 @@ Thumbs.db
 # 日志
 *.log
 *.pid
+
+# 演示环境运行时（pid/日志）
+.demo/

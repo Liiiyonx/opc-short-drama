@@ -51,6 +51,24 @@ npm install
 npm run dev                    # http://localhost:5173，/api 代理到 8000
 ```
 
+## 本地完整验证（10 分钟）
+
+三个脚本覆盖「环境自检 → 一键启动 → 性能基准」：
+
+```bash
+# 1) 环境自检：依赖 / ffmpeg / Redis / 数据库 / 密钥 / LLM 真实调用 / Edge-TTS 真实合成
+cd backend && python -m scripts.selfcheck
+
+# 2) 一键启动演示环境（API + worker + 前端 dev + 健康检查 + 演示数据）
+bash demo_up.sh                # 真实 AI 模式（自动加载项目外密钥文件）
+bash demo_up.sh --mock         # 无密钥演示模式（全程离线可跑）
+#    → 浏览器打开 http://127.0.0.1:5199   （student01 / student123）
+bash demo_down.sh              # 停止全部服务
+
+# 3) 接口性能基准（DoD #5：非 AI 接口 P95 < 500ms）
+cd backend && python -m scripts.bench_api
+```
+
 ## 开发规约（必须遵守）
 
 1. **密钥一律放项目外**：默认 `D:\VeriCall_data\secrets\opc_secrets.env`，bash 中
