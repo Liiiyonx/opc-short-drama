@@ -1,11 +1,13 @@
 """FastAPI 应用装配。
 
-P0-MVP 骨架版本：仅健康检查与配置装载。
-路由（auth / works / pipeline / tasks / orders / ability）在第 1-2 周按 docs/04-API设计.md 挂载。
+W1：健康检查 + 认证路由（auth / users）。
+后续按 docs/04-API设计.md 挂载 works / pipeline / tasks / orders / ability。
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from app.api.v1 import auth, users
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -22,6 +24,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(HTTPException)
+async def unified_http_exception_handler(request, exc: HTTPException):
+    """HTTPException 统一转成 {code, message, data} 包裹。"""
+    detail = exc.detail if isinstance(exc.detail, dict) else {
+        "code": exc.status_code,
+        "message": str(exc.detail),
+    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": detail.get("code", exc.status_code),
+            "message": detail.get("message", "error"),
+            "data": None,
+        },
+    )
+
+
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
 
 
 @app.get("/health")

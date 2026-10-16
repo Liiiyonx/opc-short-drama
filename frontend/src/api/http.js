@@ -26,6 +26,10 @@ http.interceptors.response.use(
     return body
   },
   (error) => {
+    const body = error.response && error.response.data
+    if (body && body.message) {
+      error.message = body.message
+    }
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('opc_token')
     }
