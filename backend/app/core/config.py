@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     # 数据库：开发 sqlite，生产 mysql
     database_url: str = "sqlite+aiosqlite:///./dev.db"
 
-    # Redis（arq 任务队列）
-    redis_url: str = "redis://127.0.0.1:6379/0"
+    # Redis（arq 任务队列；DB1 与其他项目隔离）
+    redis_url: str = "redis://127.0.0.1:6379/1"
 
     # JWT（开发默认值仅限本地；生产必须在环境变量注入强随机密钥）
     jwt_secret: str = "opc-dev-secret-change-me-in-production-2026"

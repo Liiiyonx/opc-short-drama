@@ -78,14 +78,23 @@ async def generate_work(
     work_id: int, body: GenerateIn, user: CurrentUser, db: DbSession
 ):
     work, result = await works_service.generate(db, user, work_id, body)
-    return ok(
+    data = {"work": _work_dict(work)}
+    if result.get("async"):
+        data.update(
+            {
+                "session_id": result["session_id"],
+                "async": True,
+                "status": "running",
+            }
+        )
+        return ok(data, "已入队，请轮询 /api/v1/tasks/{session_id} 查看进度")
+    data.update(
         {
-            "work": _work_dict(work),
-            "session_id": result["session_id"],
-            "result": result["result"],
-        },
-        "生成成功",
+            "session_id": result.get("session_id"),
+            "result": result.get("result"),
+        }
     )
+    return ok(data, "生成成功")
 
 
 @router.post("/{work_id}/assets", summary="上传文件资产")

@@ -17,21 +17,19 @@ from app.models.work import WORK_TYPES, Work, WorkAsset
 from app.schemas.work import GenerateIn
 from app.services.storage.base import generate_key
 from app.services.storage.factory import get_storage
+from app.services.tts.voices import market_to_lang
+from app.services.work_store import (
+    latest_asset,
+    latest_json_asset as _latest_json_asset,
+    load_my_work as _load_my_work,
+    save_asset,
+)
 
 
 def _not_found() -> HTTPException:
     return HTTPException(
         status_code=404, detail={"code": 40401, "message": "作品不存在"}
     )
-
-
-async def _load_my_work(db: AsyncSession, user: User, work_id: int) -> Work:
-    work = (
-        await db.execute(select(Work).where(Work.id == work_id))
-    ).scalar_one_or_none()
-    if work is None or (work.created_by != user.id and user.role != "admin"):
-        raise _not_found()
-    return work
 
 
 async def create_work(
@@ -149,24 +147,6 @@ async def _save_result_asset(
     return asset
 
 
-async def _latest_json_asset(db: AsyncSession, work_id: int) -> dict | None:
-    asset = (
-        (
-            await db.execute(
-                select(WorkAsset)
-                .where(WorkAsset.work_id == work_id, WorkAsset.kind == "json")
-                .order_by(WorkAsset.id.desc())
-            )
-        )
-        .scalars()
-        .first()
-    )
-    if asset is None:
-        return None
-    raw = get_storage().get_bytes(asset.storage_key).decode("utf-8")
-    return json.loads(raw)
-
-
 async def generate(
     db: AsyncSession, user: User, work_id: int, body: GenerateIn
 ) -> tuple[Work, dict]:
@@ -216,16 +196,105 @@ async def generate(
             "target_seconds": body.target_seconds or 120,
         }
         agent_type = "storyboard"
+    elif work.type == "audio":
+        # 从分镜作品提取台词行 → 配音（异步）
+        if body.storyboard_work_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": 40001,
+                    "message": "配音生成需要 storyboard_work_id（分镜作品 id）",
+                },
+            )
+        storyboard = await _load_my_work(db, user, body.storyboard_work_id)
+        if storyboard.type != "storyboard":
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 40001, "message": "storyboard_work_id 必须是分镜作品"},
+            )
+        shots_data = await _latest_json_asset(db, storyboard.id)
+        if not shots_data or not shots_data.get("shots"):
+            raise HTTPException(
+                status_code=409,
+                detail={"code": 40901, "message": "分镜作品没有产物，请先执行分镜生成"},
+            )
+        lang = body.lang or market_to_lang(
+            (storyboard.meta_json or {}).get("target_market")
+        )
+        lines = [
+            {
+                "line_id": shot.get("shot_no", index + 1),
+                "role": "narrator",
+                "text": shot.get("dialogue", ""),
+                "lang": lang,
+            }
+            for index, shot in enumerate(shots_data["shots"])
+            if shot.get("dialogue")
+        ]
+        if not lines:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": 40001, "message": "分镜中没有台词，无法配音"},
+            )
+        payload = {"lines": lines, "voice_map": body.voice_map}
+        agent_type = "tts"
+    elif work.type == "subtitle":
+        # 从配音作品复制 SRT（同步，供人工校轴）
+        if body.audio_work_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": 40001,
+                    "message": "字幕生成需要 audio_work_id（配音作品 id）",
+                },
+            )
+        audio_work = await _load_my_work(db, user, body.audio_work_id)
+        srt_asset = await latest_asset(db, audio_work.id, "srt")
+        if srt_asset is None:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": 40901, "message": "配音作品没有 SRT，请先执行配音生成"},
+            )
+        srt_text = get_storage().get_bytes(srt_asset.storage_key).decode("utf-8")
+        await save_asset(db, work.id, "srt", srt_text.encode("utf-8"), "text/plain")
+        work.status = "ready"
+        work.meta_json = {"source_work_id": body.audio_work_id}
+        await db.commit()
+        await db.refresh(work)
+        return work, {"session_id": None, "agent_type": None, "result": {"copied": True}}
+    elif work.type == "video":
+        # 分镜图 + 配音 + SRT → 烧字幕 MP4（异步）
+        if body.storyboard_work_id is None or body.audio_work_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": 40001,
+                    "message": "视频生成需要 storyboard_work_id 与 audio_work_id",
+                },
+            )
+        payload = {
+            "storyboard_work_id": body.storyboard_work_id,
+            "audio_work_id": body.audio_work_id,
+            "width": body.width or 720,
+            "height": body.height or 1280,
+        }
+        agent_type = "compose"
     else:
         raise HTTPException(
             status_code=409,
             detail={
                 "code": 40901,
-                "message": f"{work.type} 类型作品的生成将在后续周实现",
+                "message": f"{work.type} 类型作品的生成尚未实现",
             },
         )
 
     result = await invoke_agent(agent_type, payload, user=user, db=db, work_id=work.id)
+
+    if result.get("async"):
+        # 异步智能体：作品置 generating，worker 完成后推进为 ready
+        work.status = "generating"
+        await db.commit()
+        return work, result
 
     if work.status == "draft" and work.version == 1:
         target = work
@@ -286,3 +355,34 @@ async def set_ai_declare(
     await db.commit()
     await db.refresh(work)
     return work
+
+
+async def finalize_work_from_session(db: AsyncSession, session) -> None:
+    """异步智能体完成后推进关联作品状态（arq worker 调用）。
+
+    资产已由智能体自身写入（ctx.work_id）；这里只更新作品状态与摘要。
+    异步作品的再生成不建版本链（P1 项），资产按次追加。
+    """
+    if session.work_id is None or session.status != "success":
+        return
+    work = (
+        await db.execute(select(Work).where(Work.id == session.work_id))
+    ).scalar_one_or_none()
+    if work is None or work.status == "ready":
+        return
+    result = session.output_json or {}
+    work.status = "ready"
+    if work.type == "audio":
+        work.meta_json = {
+            "lines": len(result.get("assets", [])),
+            "total_duration_ms": result.get("total_duration_ms", 0),
+            "srt_key": result.get("srt_key"),
+        }
+    elif work.type == "video":
+        work.meta_json = {
+            "images_used": result.get("images_used", 0),
+            "placeholder": result.get("placeholder", False),
+            "duration_ms": result.get("duration_ms", 0),
+            "video_key": result.get("video_key"),
+        }
+    await db.commit()

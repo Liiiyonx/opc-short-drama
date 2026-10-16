@@ -38,6 +38,10 @@ pip install -r requirements.txt
 cp ../.env.example .env        # 按需修改；密钥见下方规约
 uvicorn app.main:app --reload --port 8000
 
+# 异步任务 worker（配音/成片合成走 arq + Redis，需另开终端；依赖 Redis 与 ffmpeg）
+cd backend
+python -m arq app.workers.tasks.WorkerSettings
+
 # 前端
 cd frontend
 npm install

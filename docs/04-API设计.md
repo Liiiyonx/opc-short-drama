@@ -49,7 +49,7 @@
 | POST | /works | 创建作品 `{title, type, task_id?}`，初始 draft |
 | GET | /works | 我的作品列表（type 过滤、分页） |
 | GET | /works/{id} | 详情：作品 + 资产（含 URL）+ 子版本链 |
-| POST | /works/{id}/generate | 生成 / 重生成。script：传剧本参数；storyboard：传 `{source_work_id, episode}`。首次生成原地升级 draft→ready，再次生成创建 parent 链新版本 |
+| POST | /works/{id}/generate | 生成 / 重生成。script：剧本参数；storyboard：`{source_work_id, episode}`；audio：`{storyboard_work_id, lang?, voice_map?}`（异步）；subtitle：`{audio_work_id}`（同步复制 SRT）；video：`{storyboard_work_id, audio_work_id}`（异步）。首次生成原地升级 draft→ready，再次生成创建 parent 链新版本（异步类型不建版本链，P1 项） |
 | POST | /works/{id}/assets | multipart 上传文件资产（file + kind） |
 | POST | /works/{id}/text-assets | 登记文本资产 `{kind: text/json/srt, content}` |
 | GET | /works/{id}/assets | 资产列表（含访问 URL） |
@@ -89,6 +89,10 @@
 |---|---|---|
 | POST | /agents/tts/invoke | 入队，返回 `{task_id}` |
 | GET | /tasks/{task_id} | 轮询 `{status, progress, result?, error?}` |
+
+> 异步智能体（tts / compose）经作品 generate 入口入队后返回 `session_id`，
+> 由 arq worker（`python -m arq app.workers.tasks.WorkerSettings`）执行，
+> 前端轮询 `GET /tasks/{session_id}`：running → success / failed。P1 升级 SSE。
 
 > P1 升级：SSE `/agents/stream/{session_id}` 推送生成进度。
 

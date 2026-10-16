@@ -1,22 +1,33 @@
-"""智能体编排器：统一处理「契约校验 → 配额检查 → 执行 → 会话/产物落库 → 调用日志」。"""
+"""智能体编排器：统一处理「契约校验 → 配额检查 → 会话 → 执行 → 落库 → 调用日志」。
+
+同步智能体：invoke_agent 直接执行并返回结果。
+异步智能体（is_async=True，如 tts/compose）：创建会话 → arq 入队 →
+立即返回 session_id；worker 调 execute_session 执行并落库。
+"""
 import time
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.base import Agent, AgentContext
 from app.agents.registry import get_agent_class
+from app.db.session import AsyncSessionLocal
 from app.models.agent import AgentCallLog, AgentSession
 from app.models.user import User
-from app.services.llm.client import LLMError, LLMNotConfigured
+from app.services.llm.client import LLMError
 from app.services.llm.quota import QuotaExceeded, ensure_quota
 from app.services.llm.router import estimate_cost_cny
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class QueueUnavailable(Exception):
+    """任务队列（Redis）不可用。"""
 
 
 async def invoke_agent(
@@ -26,10 +37,10 @@ async def invoke_agent(
     db: AsyncSession,
     work_id: int | None = None,
 ) -> dict:
-    agent: type[Agent] = get_agent_class(agent_type)
+    agent_cls = get_agent_class(agent_type)
 
     try:
-        validated = agent.input_schema.model_validate(payload)
+        validated = agent_cls.input_schema.model_validate(payload)
     except ValidationError as exc:
         raise HTTPException(
             status_code=422,
@@ -63,37 +74,109 @@ async def invoke_agent(
     db.add(session)
     await db.flush()
 
-    ctx = AgentContext(db=db, user=user, work_id=work_id)
+    if agent_cls.is_async:
+        try:
+            await _enqueue_session(session.id)
+        except QueueUnavailable as exc:
+            await _finish_failed(db, session, f"任务队列不可用：{exc}")
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": 50301,
+                    "message": "任务队列（Redis）不可用，请检查 REDIS_URL 与 Redis 服务",
+                },
+            )
+        await db.commit()
+        return {
+            "session_id": session.id,
+            "agent_type": agent_type,
+            "async": True,
+            "status": "running",
+        }
+
+    ctx = AgentContext(db=db, user=user, work_id=work_id, session_id=session.id)
     started = time.perf_counter()
     try:
-        result = await agent().run(validated, ctx)
-    except LLMNotConfigured as exc:
-        await _finish_failed(db, session, str(exc))
-        raise HTTPException(status_code=502, detail={"code": 50002, "message": str(exc)})
+        result = await agent_cls().run(validated, ctx)
     except LLMError as exc:
         await _finish_failed(db, session, str(exc))
         raise HTTPException(status_code=502, detail={"code": 50002, "message": str(exc)})
-    except Exception as exc:  # 契约校验失败等未预期错误
+    except Exception as exc:
         await _finish_failed(db, session, f"智能体执行失败：{exc}")
         raise HTTPException(
             status_code=500,
             detail={"code": 50001, "message": "智能体执行失败，请稍后重试"},
         )
+    await _finish_success(
+        db, session, result, ctx, int((time.perf_counter() - started) * 1000)
+    )
+    return {
+        "session_id": session.id,
+        "agent_type": agent_type,
+        "result": result.model_dump(mode="json"),
+    }
 
-    duration_ms = int((time.perf_counter() - started) * 1000)
+
+async def execute_session(session_id: int) -> None:
+    """worker 入口：加载会话 → 执行 → 落库（成功/失败均写调用日志）。"""
+    async with AsyncSessionLocal() as db:
+        session = (
+            await db.execute(
+                select(AgentSession).where(AgentSession.id == session_id)
+            )
+        ).scalar_one_or_none()
+        if session is None or session.status != "running":
+            return
+        agent_cls = get_agent_class(session.agent_type)
+        user = (
+            await db.execute(select(User).where(User.id == session.user_id))
+        ).scalar_one_or_none()
+        if user is None:
+            await _finish_failed(db, session, "用户不存在")
+            return
+        ctx = AgentContext(
+            db=db, user=user, work_id=session.work_id, session_id=session.id
+        )
+        started = time.perf_counter()
+        try:
+            payload = agent_cls.input_schema.model_validate(session.input_json or {})
+            result = await agent_cls().run(payload, ctx)
+        except Exception as exc:
+            await _finish_failed(db, session, f"智能体执行失败：{exc}")
+            return
+        await _finish_success(
+            db, session, result, ctx, int((time.perf_counter() - started) * 1000)
+        )
+
+
+async def _enqueue_session(session_id: int) -> None:
+    from app.workers.tasks import enqueue_agent_job
+
+    try:
+        await enqueue_agent_job(session_id)
+    except Exception as exc:
+        raise QueueUnavailable(str(exc))
+
+
+async def _finish_success(
+    db: AsyncSession,
+    session: AgentSession,
+    result,
+    ctx: AgentContext,
+    duration_ms: int,
+) -> None:
     output = result.model_dump(mode="json")
     usage = ctx.usage or {}
     prompt_tokens = int(usage.get("prompt_tokens", 0))
     completion_tokens = int(usage.get("completion_tokens", 0))
-
     session.status = "success"
     session.output_json = output
     session.finished_at = _now()
     db.add(
         AgentCallLog(
             session_id=session.id,
-            user_id=user.id,
-            agent_type=agent_type,
+            user_id=session.user_id,
+            agent_type=session.agent_type,
             provider=usage.get("provider", ""),
             model=usage.get("model", ""),
             prompt_tokens=prompt_tokens,
@@ -106,7 +189,6 @@ async def invoke_agent(
         )
     )
     await db.commit()
-    return {"session_id": session.id, "agent_type": agent_type, "result": output}
 
 
 async def _finish_failed(db: AsyncSession, session: AgentSession, error: str) -> None:

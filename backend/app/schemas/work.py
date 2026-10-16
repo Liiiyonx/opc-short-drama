@@ -30,6 +30,14 @@ class GenerateIn(BaseModel):
     aspect_ratio: str | None = None
     style_hint: str | None = None
     target_seconds: int | None = None
+    # 配音参数
+    storyboard_work_id: int | None = None
+    lang: str | None = None
+    voice_map: dict | None = None
+    # 视频参数
+    audio_work_id: int | None = None
+    width: int | None = None
+    height: int | None = None
 
 
 class TextAssetIn(BaseModel):
