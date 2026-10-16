@@ -51,6 +51,12 @@ const routes = [
     name: 'enterprise-home',
     component: () => import('../views/enterprise/Home.vue'),
     meta: { role: 'enterprise' }
+  },
+  {
+    path: '/admin',
+    name: 'admin-home',
+    component: () => import('../views/admin/AdminHome.vue'),
+    meta: { role: 'admin' }
   }
 ]
 
@@ -65,7 +71,11 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   if (to.name === 'login' && token) {
-    return { path: '/student' }
+    const userStore = useUserStore()
+    if (!userStore.profile) {
+      await userStore.fetchMe()
+    }
+    return { path: roleHome(userStore.profile ? userStore.profile.role : '') }
   }
   if (to.meta.role && token) {
     const userStore = useUserStore()

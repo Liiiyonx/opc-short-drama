@@ -11,7 +11,7 @@ from app.models.profile import (
     TeacherProfile,
 )
 from app.models.user import User
-from app.schemas.user import UserCreate, UserOut
+from app.schemas.user import UserCreate, UserOut, UserStatusIn
 
 router = APIRouter(prefix="/users", tags=["用户"])
 
@@ -119,3 +119,22 @@ async def create_user(body: UserCreate, db: DbSession):
     await db.commit()
     await db.refresh(user)
     return ok(UserOut.model_validate(user).model_dump(), "创建成功")
+
+
+@router.patch(
+    "/{user_id}/status",
+    summary="启用 / 禁用用户（管理员）",
+    dependencies=[Depends(require_role("admin"))],
+)
+async def update_user_status(user_id: int, body: UserStatusIn, db: DbSession):
+    user = (
+        await db.execute(select(User).where(User.id == user_id))
+    ).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=404, detail={"code": 40401, "message": "用户不存在"}
+        )
+    user.status = body.status
+    await db.commit()
+    await db.refresh(user)
+    return ok(UserOut.model_validate(user).model_dump(), "已更新")

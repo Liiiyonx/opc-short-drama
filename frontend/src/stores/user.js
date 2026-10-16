@@ -6,7 +6,7 @@ const ROLE_HOME = {
   student: '/student',
   teacher: '/teacher',
   enterprise: '/enterprise',
-  admin: '/student'
+  admin: '/admin'
 }
 
 export function roleHome(role) {
