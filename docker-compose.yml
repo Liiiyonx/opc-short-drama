@@ -1,19 +1,22 @@
 # 生产编排：nginx(web) + api + worker + mysql + redis + minio
 # 用法：
-#   cp .env.example .env  # 填 LLM_API_KEY 等
-#   bash deploy.sh        # 或手动 docker compose up -d --build
+#   cp .env.example .env   # 填 LLM_API_KEY / JWT_SECRET / 各服务密码
+#   bash deploy.sh
+#
+# 安全基线（2026-10 加固）：
+# - 数据面（mysql/redis/minio）不发布公网端口，仅 compose 内网互通；
+# - Redis 必须带密码；凭据全部从 .env 注入，不再硬编码；
+# - api/worker 以 OPC_ENV=prod 运行：弱 JWT_SECRET 直接拒绝启动。
 services:
   mysql:
     image: mysql:8.0
     container_name: opc-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: opcroot
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 配置 MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: opc
-      MYSQL_USER: opc
-      MYSQL_PASSWORD: opc
+      MYSQL_USER: ${MYSQL_USER:-opc}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 配置 MYSQL_PASSWORD}
     command: --default-authentication-plugin=mysql_native_password
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -21,25 +24,50 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
 
   redis:
     image: redis:7-alpine
     container_name: opc-redis
-    ports:
-      - "6379:6379"
+    # 无密码的 Redis 绝不暴露；requirepass 由 .env 注入
+    command: redis-server --requirepass ${REDIS_PASSWORD:?请在 .env 配置 REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
   minio:
     image: minio/minio:latest
     container_name: opc-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: opcadmin
-      MINIO_ROOT_PASSWORD: opcadmin123
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-opcadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?请在 .env 配置 MINIO_ROOT_PASSWORD}
     volumes:
       - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    # 控制台仅本机可访问（SSH 隧道调试用）；9000 数据口不发布，走内网
+    ports:
+      - "127.0.0.1:9001:9001"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
   api:
     build: ./backend
@@ -47,23 +75,32 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_URL: mysql+aiomysql://opc:opc@mysql:3306/opc?charset=utf8mb4
-      REDIS_URL: redis://redis:6379/1
+      OPC_ENV: prod
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-opc}:${MYSQL_PASSWORD}@mysql:3306/opc?charset=utf8mb4
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       STORAGE_BACKEND: minio
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: opcadmin
-      MINIO_SECRET_KEY: opcadmin123
-      MINIO_BUCKET: opc
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-opcadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-opc}
     depends_on:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       minio:
-        condition: service_started
-    ports:
-      - "8000:8000"
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   worker:
     build: ./backend
@@ -72,28 +109,44 @@ services:
     env_file:
       - ./.env
     environment:
-      DATABASE_URL: mysql+aiomysql://opc:opc@mysql:3306/opc?charset=utf8mb4
-      REDIS_URL: redis://redis:6379/1
+      OPC_ENV: prod
+      DATABASE_URL: mysql+aiomysql://${MYSQL_USER:-opc}:${MYSQL_PASSWORD}@mysql:3306/opc?charset=utf8mb4
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       STORAGE_BACKEND: minio
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: opcadmin
-      MINIO_SECRET_KEY: opcadmin123
-      MINIO_BUCKET: opc
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-opcadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-opc}
     depends_on:
       mysql:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # ffmpeg/视频合成内存大头，给足但封顶（4C8G 单 VPS 预算内）
+          memory: 2g
 
   web:
     build: ./frontend
     container_name: opc-web
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "8080:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
 volumes:
   mysql_data:

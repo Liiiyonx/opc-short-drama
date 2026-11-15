@@ -19,11 +19,27 @@ echo "==> 2/5 检查环境变量文件"
 if [ ! -f .env ]; then
     cp .env.example .env
     echo "已生成 .env（来自 .env.example）。"
-    echo "！！请先编辑 .env 填入 LLM_API_KEY（DeepSeek）等密钥，然后重新执行本脚本。"
+    echo "！！请先编辑 .env 填入 LLM_API_KEY / JWT_SECRET / 各服务密码，然后重新执行本脚本。"
     exit 0
 fi
 if grep -q "^LLM_API_KEY=$" .env 2>/dev/null; then
     echo "警告：.env 中 LLM_API_KEY 为空，AI 生成类接口会明确报错（不会静默降级）。"
+fi
+# 生产凭据预检：缺项/弱密钥在这里给出人话提示，好过容器启动后崩溃循环
+missing=()
+for var in MYSQL_ROOT_PASSWORD MYSQL_PASSWORD REDIS_PASSWORD MINIO_ROOT_PASSWORD; do
+    if grep -q "^${var}=$" .env 2>/dev/null || ! grep -q "^${var}=" .env 2>/dev/null; then
+        missing+=("$var")
+    fi
+done
+if [ ${#missing[@]} -gt 0 ]; then
+    echo "错误：.env 缺少必填凭据：${missing[*]}（数据面已不暴露公网端口，但内网仍需强口令）" >&2
+    exit 1
+fi
+if grep -q "^JWT_SECRET=opc-dev-secret-change-me-in-production-2026" .env 2>/dev/null; then
+    echo "错误：JWT_SECRET 仍为开发默认值，生产（OPC_ENV=prod）会拒绝启动。" >&2
+    echo "生成强密钥：openssl rand -hex 32，填入 .env 的 JWT_SECRET 后重试。" >&2
+    exit 1
 fi
 
 echo "==> 3/5 构建并启动全部服务（mysql/redis/minio/api/worker/web）"
@@ -43,10 +59,9 @@ echo "==> 5/5 灌入演示数据（幂等）"
 docker compose exec -T api python -m scripts.seed || true
 
 echo
-echo "部署完成："
-echo "  前端      http://<服务器IP>:8080"
-echo "  API 文档  http://<服务器IP>:8000/docs"
-echo "  MinIO 控制台 http://<服务器IP>:9001"
+echo "部署完成（安全基线：mysql/redis/minio 仅内网互通，未发布公网端口）："
+echo "  前端（含 API 反代）  http://<服务器IP>:8080"
+echo "  MinIO 控制台         SSH 隧道：ssh -L 9001:127.0.0.1:9001 <user>@<服务器>"
 echo
 echo "演示账号：admin/admin123、teacher01/teacher123、student01/student123、enterprise01/ent123456"
 echo "注意：以上为演示数据口令，上线前必须改密或删除。"
