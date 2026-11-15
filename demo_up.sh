@@ -10,6 +10,7 @@
 set -u
 
 BASE="$(cd "$(dirname "$0")" && pwd)"
+API_PORT="${API_PORT:-8000}"  # 端口被占时可 API_PORT=8010 bash demo_up.sh
 DEMO_DIR="$BASE/.demo"
 mkdir -p "$DEMO_DIR"
 
@@ -75,20 +76,20 @@ cd "$BASE/backend" || exit 1
 # ---------- 启动服务 ----------
 echo "→ 启动 worker / API / 前端…"
 ( "$PY" -m arq app.workers.tasks.WorkerSettings > "$DEMO_DIR/worker.log" 2>&1 & echo $! > "$DEMO_DIR/worker.pid" )
-( "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > "$DEMO_DIR/api.log" 2>&1 & echo $! > "$DEMO_DIR/api.pid" )
+( "$PY" -m uvicorn app.main:app --host 127.0.0.1 --port "$API_PORT" > "$DEMO_DIR/api.log" 2>&1 & echo $! > "$DEMO_DIR/api.pid" )
 
 cd "$BASE/frontend" || exit 1
 if [ ! -d node_modules ]; then
   echo "→ 首次运行：安装前端依赖（npm install）…"
   npm install >/dev/null 2>&1
 fi
-( VITE_API_TARGET=http://127.0.0.1:8000 npm run dev -- --port 5199 --strictPort > "$DEMO_DIR/vite.log" 2>&1 & echo $! > "$DEMO_DIR/vite.pid" )
+( VITE_API_TARGET="http://127.0.0.1:$API_PORT" npm run dev -- --port 5199 --strictPort > "$DEMO_DIR/vite.log" 2>&1 & echo $! > "$DEMO_DIR/vite.pid" )
 
 # ---------- 健康检查 ----------
 echo "→ 健康检查…"
 API_OK=0
 for _ in $(seq 1 40); do
-  if curl -s -m 2 http://127.0.0.1:8000/health 2>/dev/null | grep -q '"status"'; then
+  if curl -s -m 2 "http://127.0.0.1:$API_PORT/health" 2>/dev/null | grep -q '"status"'; then
     API_OK=1
     break
   fi
@@ -105,7 +106,7 @@ done
 
 echo ""
 echo "==================== OPC 演示环境 ===================="
-[ "$API_OK" = "1" ] && echo "✓ 后端 API      http://127.0.0.1:8000/docs" || echo "✗ 后端 API 未就绪（看 .demo/api.log）"
+[ "$API_OK" = "1" ] && echo "✓ 后端 API      http://127.0.0.1:$API_PORT/docs" || echo "✗ 后端 API 未就绪（看 .demo/api.log）"
 [ "$WEB_OK" = "1" ] && echo "✓ 前端工坊      http://127.0.0.1:5199  ← 浏览器打开" || echo "✗ 前端未就绪（看 .demo/vite.log）"
 echo "  运行模式      $([ "$MOCK_MODE" = "1" ] && echo 'mock 桩' || echo "真实 AI（${LLM_MODEL_DEFAULT:-deepseek-v4-flash}）")"
 echo "  演示账号      student01/student123 · teacher01/teacher123 · enterprise01/ent123456"
