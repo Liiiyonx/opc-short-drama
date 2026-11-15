@@ -35,3 +35,8 @@ Thumbs.db
 
 # 演示环境运行时（pid/日志）
 .demo/
+
+# 测试证据与本地草稿（不入库）
+gui-test-screenshots/
+backups/
+_opc_doc_dump.txt
