@@ -21,7 +21,9 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: 安装依赖
         run: pip install -r requirements.txt -r requirements-dev.txt
-      - name: 全量测试（LLM/TTS 走显式 mock；ffmpeg 由 runner 预装）
+      - name: 安装 ffmpeg（成片合成与时长探测）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: 全量测试（LLM/TTS 走显式 mock）
         run: python -m pytest tests/ -q
         env:
           LLM_PROVIDER: mock
