@@ -1,0 +1,135 @@
+/* ============================================================
+   OPC 短剧出海平台 · 全局设计基座
+   统一品牌变量 / 页面容器 / 卡片 / 表格 / 滚动条
+   说明：EP 组件观感通过覆盖 CSS 变量实现，避免与按需样式打架
+   ============================================================ */
+
+:root {
+  /* 品牌渐变（AI × 创作感：品牌蓝 → 紫） */
+  --opc-gradient: linear-gradient(135deg, #409eff 0%, #7c3aed 100%);
+  --opc-gradient-soft: linear-gradient(135deg, rgba(64, 158, 255, 0.12), rgba(124, 58, 237, 0.12));
+
+  /* EP 变量微调：更圆润的卡片与控件 */
+  --el-card-border-radius: 10px;
+  --el-border-radius-base: 8px;
+  --el-color-primary: #409eff;
+}
+
+body {
+  font-family: 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--el-bg-color-page);
+  color: var(--el-text-color-primary);
+}
+
+/* ---------- 页面容器（各端页面统一 1080px 栅格） ---------- */
+
+.page,
+.workshop {
+  padding: 24px 24px 48px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+/* ---------- 统一页面头（标题 + 副题 + 页内操作） ---------- */
+
+.page .head,
+.workshop-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page .title,
+.workshop-head .title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.page .sub,
+.workshop-head .sub {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
+/* ---------- 卡片 ---------- */
+
+body .el-card {
+  border-color: var(--el-border-color-lighter);
+}
+
+body .el-card__header {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+/* ---------- 表格：表头底色 + 更清晰的分割 ---------- */
+
+body .el-table th.el-table__cell {
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-regular);
+  font-weight: 600;
+}
+
+/* ---------- 暗色模式微调 ---------- */
+
+html.dark body {
+  background: var(--el-bg-color-page);
+}
+
+html.dark .progress-bar,
+html.dark .step-connector {
+  background: var(--el-fill-color-darker);
+}
+
+html.dark .progress-fill {
+  opacity: 0.9;
+}
+
+/* ---------- 滚动条 ---------- */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c8c9cc;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a9abb0;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- 路由切换过渡 ---------- */
+
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.page-fade-leave-to {
+  opacity: 0;
+}
+
+/* ---------- 弹窗 / 抽屉圆角与表头统一 ---------- */
+
+body .el-dialog,
+body .el-drawer {
+  border-radius: 12px;
+}

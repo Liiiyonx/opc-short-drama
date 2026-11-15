@@ -34,6 +34,10 @@ http.interceptors.response.use(
     }
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('opc_token')
+      // 过期/失效即刻回登录页，而不是停在原页等下一次操作才报错
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login')
+      }
     }
     return Promise.reject(error)
   }
@@ -209,6 +213,35 @@ export function listBids(orderId) {
 
 export function awardOrder(orderId, bidId) {
   return http.post(`/orders/${orderId}/award`, { bid_id: bidId })
+}
+
+// ---------- 用量分析（教师/管理员） ----------
+export function getUsageStats(params) {
+  return http.get('/analytics/usage', { params })
+}
+
+// ---------- 智能体会话（流水线运行记录） ----------
+export function listAgentSessions(params) {
+  return http.get('/agents/sessions', { params })
+}
+
+// ---------- 智能体直调（数据复盘/优化建议/人才匹配/AI 备课） ----------
+export function invokeAgent(type, payload) {
+  return http.post(`/agents/${type}/invoke`, payload)
+}
+
+// ---------- 能力预警（教师/管理员） ----------
+export function getAbilityWarnings(params) {
+  return http.get('/ability/warnings', { params })
+}
+
+// ---------- 作品集分享 ----------
+export function createPortfolioShare() {
+  return http.post('/portfolio/share')
+}
+
+export function getPublicPortfolio(token) {
+  return http.get(`/portfolio/public/${token}`)
 }
 
 export default http

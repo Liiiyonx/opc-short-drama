@@ -6,10 +6,11 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 export default defineConfig({
   plugins: [
     vue(),
-    // Element Plus 按需注册组件（模板里的 el-* 自动引入），
-    // 样式仍走全量 CSS（main.js 引入）——首屏 JS 从 1.1MB 降至 ~400KB。
+    // Element Plus 按需注册组件 + 按需样式（模板 el-* 自动引入对应 CSS）；
+    // 命令式 API（ElMessage/ElMessageBox）与 v-loading 的样式在 main.js 手动引入，
+    // 替代原全量 CSS（~340KB）
     Components({
-      resolvers: [ElementPlusResolver({ importStyle: false })],
+      resolvers: [ElementPlusResolver({ importStyle: 'css' })],
       dts: false
     })
   ],

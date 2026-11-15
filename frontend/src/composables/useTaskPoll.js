@@ -16,6 +16,7 @@ export function useTaskPoll() {
   const status = ref('idle')
   const error = ref('')
   const result = ref(null)
+  const usage = ref(null)
   const slow = ref(false)
   let timer = null
 
@@ -24,6 +25,7 @@ export function useTaskPoll() {
     if (data.status === 'success') {
       status.value = 'success'
       result.value = data.result
+      usage.value = data.usage || null
       return true
     }
     if (data.status === 'failed') {
@@ -40,6 +42,7 @@ export function useTaskPoll() {
     status.value = 'running'
     error.value = ''
     result.value = null
+    usage.value = null
     slow.value = false
     const loop = async () => {
       if (Date.now() - startedAt > maxMs) {
@@ -90,8 +93,9 @@ export function useTaskPoll() {
     status.value = 'idle'
     error.value = ''
     result.value = null
+    usage.value = null
     slow.value = false
   }
 
-  return { status, slow, error, result, start, stop, reset }
+  return { status, slow, error, result, usage, start, stop, reset }
 }

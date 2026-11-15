@@ -17,6 +17,24 @@ const routes = [
     meta: { role: 'student' }
   },
   {
+    path: '/student/transcript',
+    name: 'student-transcript',
+    component: () => import('../views/student/Transcript.vue'),
+    meta: { role: 'student' }
+  },
+  {
+    path: '/share/:token',
+    name: 'public-portfolio',
+    component: () => import('../views/PublicPortfolio.vue'),
+    meta: { public: true }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('../views/NotFound.vue'),
+    meta: { public: true }
+  },
+  {
     path: '/student/orders',
     name: 'student-orders',
     component: () => import('../views/student/Orders.vue'),

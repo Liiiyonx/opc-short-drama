@@ -1,11 +1,10 @@
 <template>
-  <div class="admin-home" v-loading="loading">
-    <div class="admin-head">
+  <div class="page" v-loading="loading">
+    <div class="head">
       <div>
         <h3 class="title">管理后台</h3>
         <span class="sub">用户与课程基础管理（平台管理员）</span>
       </div>
-      <el-button @click="onLogout">退出登录</el-button>
     </div>
 
     <el-tabs v-model="activeTab">
@@ -15,7 +14,7 @@
             <el-option v-for="(label, value) in ROLE_LABELS" :key="value" :label="label" :value="value" />
           </el-select>
           <el-input v-model="searchText" placeholder="按用户名搜索" clearable style="width: 200px" />
-          <el-button type="primary" @click="userDialog = true">新建用户</el-button>
+          <el-button type="primary" @click="openUserDialog">新建用户</el-button>
           <span class="count-hint">共 {{ filteredUsers.length }} 人</span>
         </div>
         <el-table :data="filteredUsers" size="small" v-loading="loadingUsers">
@@ -46,7 +45,7 @@
 
       <el-tab-pane label="课程管理" name="courses">
         <div class="toolbar">
-          <el-button type="primary" @click="courseDialog = true">新建课程</el-button>
+          <el-button type="primary" @click="openCourseDialog">新建课程</el-button>
           <span class="count-hint">共 {{ courses.length }} 门</span>
         </div>
         <el-table :data="courses" size="small" v-loading="loadingCourses">
@@ -121,7 +120,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRouter } from 'vue-router'
 
 import { createCourse, createUser, listCourses, listUsers, updateUserStatus } from '../../api/index.js'
 import { useUserStore } from '../../stores/user.js'
@@ -129,7 +127,7 @@ import { useUserStore } from '../../stores/user.js'
 const ROLE_LABELS = { student: '学生', teacher: '教师', enterprise: '企业', admin: '管理员' }
 const ROLE_TAG = { student: 'primary', teacher: 'success', enterprise: 'warning', admin: 'danger' }
 
-const router = useRouter()
+
 const userStore = useUserStore()
 
 const loading = ref(false)
@@ -143,10 +141,20 @@ const searchText = ref('')
 const statusSavingId = ref(null)
 
 const userDialog = ref(false)
+
+function openUserDialog() {
+  userForm.value = { username: '', password: '', role: 'student', phone: '' }
+  userDialog.value = true
+}
 const userSaving = ref(false)
 const userForm = ref({ username: '', password: '', role: 'student', phone: '' })
 
 const courseDialog = ref(false)
+
+function openCourseDialog() {
+  courseForm.value = { code: '', name: '', semester: '', class_names_text: '' }
+  courseDialog.value = true
+}
 const courseSaving = ref(false)
 const courseForm = ref({ code: '', name: '', semester: '', class_names_text: '' })
 
@@ -253,11 +261,6 @@ async function onCreateCourse() {
   }
 }
 
-function onLogout() {
-  userStore.logout()
-  router.push('/login')
-}
-
 onMounted(async () => {
   loading.value = true
   try {
@@ -269,26 +272,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.admin-home {
-  padding: 20px 24px 40px;
-  max-width: 1080px;
-  margin: 0 auto;
-}
-.admin-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 8px;
-}
-.title {
-  margin: 0;
-  font-weight: 500;
-}
-.sub {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
 .toolbar {
   display: flex;
   align-items: center;

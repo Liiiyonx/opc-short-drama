@@ -1,22 +1,28 @@
 <template>
   <div class="page">
-    <div class="home-head">
+    <div class="head">
       <div>
         <h3 class="title">学生工作台</h3>
         <span class="sub">{{ greeting }}</span>
       </div>
       <div class="actions">
+        <el-button @click="router.push('/student/transcript')">学习档案</el-button>
+        <el-button @click="sharePortfolio">分享作品集</el-button>
         <el-button @click="router.push('/student/orders')">工单大厅</el-button>
         <el-button type="primary" @click="newDialog = true">新建剧集</el-button>
-        <el-button text @click="logout">退出登录</el-button>
       </div>
     </div>
 
     <el-row :gutter="12" class="stat-row">
-      <el-col :span="6" v-for="stat in stats" :key="stat.label">
+      <el-col :span="6" v-for="stat in stats" :key="stat.key">
         <el-card shadow="never" class="stat-card">
-          <div class="stat-num">{{ stat.value }}</div>
-          <div class="stat-label">{{ stat.label }}</div>
+          <div class="stat-inner">
+            <span class="stat-icon" :class="stat.cls" v-html="stat.icon"></span>
+            <div>
+              <div class="stat-num">{{ stat.value }}</div>
+              <div class="stat-label">{{ stat.label }}</div>
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -72,7 +78,15 @@
         <span>我的作品</span>
         <el-button size="small" text type="primary" @click="reload">刷新</el-button>
       </template>
-      <el-table :data="works" v-loading="loading" empty-text="还没有作品，点击「新建剧集」开始创作">
+      <el-skeleton v-if="loading && !works.length" :rows="4" animated class="table-skeleton" />
+      <el-table v-else :data="works" v-loading="loading">
+        <template #empty>
+          <div class="empty-guide">
+            <p class="eg-title">还没有作品</p>
+            <p class="eg-desc">从一句话题材开始，AI 帮你走完剧本 → 分镜 → 配音 → 成片</p>
+            <el-button type="primary" @click="newDialog = true">新建第一部剧</el-button>
+          </div>
+        </template>
         <el-table-column label="标题" prop="title" min-width="160" show-overflow-tooltip />
         <el-table-column label="类型" width="100">
           <template #default="{ row }">
@@ -129,6 +143,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import {
+  createPortfolioShare,
   getStudentAbility,
   getTaskDetail,
   listTasks as apiListTasks,
@@ -138,6 +153,18 @@ import { useUserStore } from '../../stores/user.js'
 import { useWorkStore } from '../../stores/work.js'
 
 const DIMENSIONS = ['内容创作', '跨文化沟通', '电商运营', 'AI工具应用', '数据分析']
+
+// 统计卡图标（内联 SVG，Feather 线条风，随文字色渲染）
+const STAT_ICONS = {
+  script:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  storyboard:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>',
+  audio:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>',
+  video:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>'
+}
 
 const TYPE_LABELS = {
   script: '剧本',
@@ -245,11 +272,11 @@ const loading = computed(() => workStore.loading)
 const stats = computed(() => {
   const all = workStore.works
   return [
-    { label: '剧本', value: all.filter((w) => w.type === 'script').length },
-    { label: '分镜', value: all.filter((w) => w.type === 'storyboard').length },
-    { label: '配音', value: all.filter((w) => w.type === 'audio').length },
-    { label: '成片', value: all.filter((w) => w.type === 'video').length }
-  ]
+    { key: 'script', label: '剧本', value: all.filter((w) => w.type === 'script').length, cls: 'g-blue' },
+    { key: 'storyboard', label: '分镜', value: all.filter((w) => w.type === 'storyboard').length, cls: 'g-violet' },
+    { key: 'audio', label: '配音', value: all.filter((w) => w.type === 'audio').length, cls: 'g-amber' },
+    { key: 'video', label: '成片', value: all.filter((w) => w.type === 'video').length, cls: 'g-green' }
+  ].map((stat) => ({ ...stat, icon: STAT_ICONS[stat.key] }))
 })
 
 const greeting = computed(() => {
@@ -258,6 +285,17 @@ const greeting = computed(() => {
   const major = profile && profile.major ? ` · ${profile.major}` : ''
   return `${name}${major} · 学中做，做中创`
 })
+
+async function sharePortfolio() {
+  try {
+    const data = await createPortfolioShare()
+    const link = `${location.origin}${data.path}`
+    await navigator.clipboard.writeText(link)
+    ElMessage.success('脱敏分享链接已复制：' + link)
+  } catch (error) {
+    ElMessage.error(error.message || '分享失败')
+  }
+}
 
 function statusType(status) {
   if (status === 'ready') return 'success'
@@ -283,11 +321,6 @@ async function createAndEnter() {
   router.push(`/student/workshop/${work.id}`)
 }
 
-function logout() {
-  userStore.logout()
-  router.push('/login')
-}
-
 async function reload() {
   await workStore.loadWorks({ page: 1, page_size: 50 })
 }
@@ -303,25 +336,24 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page {
-  padding: 20px 24px 40px;
-  max-width: 1080px;
-  margin: 0 auto;
+.empty-guide {
+  padding: 14px 0 8px;
 }
-.home-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.title {
+.eg-title {
   margin: 0 0 4px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
-.sub {
-  font-size: 13px;
+.eg-desc {
+  margin: 0 0 12px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
+.table-skeleton {
+  padding: 6px 2px 2px;
+}
+
 .stat-row {
   margin-bottom: 16px;
 }
@@ -343,6 +375,9 @@ onMounted(async () => {
   color: var(--el-text-color-secondary);
   flex-shrink: 0;
 }
+.ability-line :deep(.el-progress) {
+  flex: 1; /* flex 行内进度条默认宽度 0（存量问题：只显示百分比、不见条） */
+}
 .submit-tip {
   margin: 0 0 10px;
   font-size: 13px;
@@ -356,16 +391,48 @@ onMounted(async () => {
 .submit-note {
   margin-top: 12px;
 }
-.stat-card {
-  text-align: center;
+.stat-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stat-icon :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+.g-blue {
+  background: rgba(64, 158, 255, 0.12);
+  color: #409eff;
+}
+.g-violet {
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+}
+.g-amber {
+  background: rgba(230, 162, 60, 0.15);
+  color: #e6a23c;
+}
+.g-green {
+  background: rgba(103, 194, 58, 0.15);
+  color: #67c23a;
 }
 .stat-num {
   font-size: 24px;
-  font-weight: 500;
+  font-weight: 700;
+  line-height: 1.15;
 }
 .stat-label {
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 </style>

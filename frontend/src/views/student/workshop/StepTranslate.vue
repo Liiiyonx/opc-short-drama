@@ -33,6 +33,7 @@
         show-icon
         :title="`翻译完成：${meta.lines || 0} 行台词 → ${localeLabel}${meta.notes ? `，${meta.notes} 条替换说明` : ''}${meta.flags ? `，${meta.flags} 条合规提示` : ''}`"
       />
+      <UsageChip :usage="usage" class="usage-row" />
 
       <el-table v-if="product.lines && product.lines.length" :data="product.lines" size="small" class="loc-table">
         <el-table-column prop="line_id" label="#" width="52" />
@@ -81,6 +82,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { fetchFileBlob, generateWork, getWork } from '../../../api/index.js'
+import UsageChip from '../../../components/UsageChip.vue'
 
 const props = defineProps({
   work: { type: Object, default: null },
@@ -101,6 +103,7 @@ const LOCALES = [
 ]
 
 const saving = ref(false)
+const usage = ref(null)
 const regenerating = ref(false)
 const locale = ref('en-US')
 const product = ref({})
@@ -162,6 +165,7 @@ async function onGenerate() {
       payload.target_locale = locale.value
     }
     const data = await generateWork(props.work.id, payload)
+    usage.value = data.usage || null
     emit('generated', data)
   } finally {
     saving.value = false
@@ -179,6 +183,10 @@ watch(() => [props.work && props.work.id, props.work && props.work.status], () =
 </script>
 
 <style scoped>
+.usage-row {
+  margin: 0 0 10px;
+}
+
 .step-panel {
   padding: 4px 0 8px;
 }

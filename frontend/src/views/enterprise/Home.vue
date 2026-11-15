@@ -7,7 +7,6 @@
       </div>
       <div>
         <el-button type="primary" @click="openForm">发布工单</el-button>
-        <el-button text @click="logout">退出登录</el-button>
       </div>
     </div>
 
@@ -16,7 +15,14 @@
         <span>我的工单</span>
         <el-button size="small" text type="primary" @click="reload">刷新</el-button>
       </template>
-      <el-table :data="orders" v-loading="loading" empty-text="还没有工单，点击「发布工单」开始">
+      <el-table :data="orders" v-loading="loading">
+        <template #empty>
+          <div class="empty-guide">
+            <p class="eg-title">还没有工单</p>
+            <p class="eg-desc">发布真实出海需求，学生团队将在工坊完成交付</p>
+            <el-button type="primary" @click="openForm">发布第一个工单</el-button>
+          </div>
+        </template>
         <el-table-column prop="title" label="工单标题" min-width="180" show-overflow-tooltip />
         <el-table-column label="预算" width="110">
           <template #default="{ row }">{{ (row.budget_cents / 100).toFixed(0) }} 元</template>
@@ -104,16 +110,31 @@
           <p class="bid-proposal">{{ bid.proposal || '（未填写方案）' }}</p>
         </div>
       </template>
-    </el-drawer>
+    <el-divider content-position="left">AI 人才匹配（脱敏视图）</el-divider>
+        <el-button size="small" type="primary" :loading="matchLoading" @click="runMatch">
+          {{ matches.length ? '重新匹配' : '匹配合适的学生团队' }}
+        </el-button>
+        <p class="hint" style="margin: 8px 0 0">按五维能力均分 + 工单侧重维度（题材→内容创作、市场→跨文化沟通）打分；确认意向后联系教师建立对接。</p>
+        <div v-for="(c, i) in matches" :key="i" class="match-card">
+          <div class="match-head">
+            <b class="match-alias">{{ c.alias }}</b>
+            <el-tag size="small" effect="plain">{{ c.major || '专业未填' }}</el-tag>
+            <span class="match-score">均分 {{ c.avg_score }}</span>
+          </div>
+          <div class="match-reason">{{ c.match_reason }}</div>
+          <div class="match-dims">
+            <span v-for="(v, dim) in c.dimensions" :key="dim" class="match-dim">{{ dim }} {{ v }}</span>
+          </div>
+        </div>
+      </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-import { awardOrder, createOrder, getOrder, listOrders } from '../../api/index.js'
+import { awardOrder, createOrder, getOrder, invokeAgent, listOrders } from '../../api/index.js'
 import { useUserStore } from '../../stores/user.js'
 
 const STATUS_LABELS = {
@@ -127,7 +148,7 @@ const STATUS_LABELS = {
 }
 const BID_LABELS = { active: '有效', won: '中标', lost: '未中', withdrawn: '撤回' }
 
-const router = useRouter()
+
 const userStore = useUserStore()
 
 const orders = ref([])
@@ -137,6 +158,8 @@ const formVisible = ref(false)
 const detailVisible = ref(false)
 const current = ref(null)
 const bids = ref([])
+const matchLoading = ref(false)
+const matches = ref([])
 const form = ref({ title: '', genre: '', market: '北美', episodes: 6, lang: 'en-US', budgetYuan: 3000, delivery: '', deadline: null })
 
 const companyName = computed(() => {
@@ -208,12 +231,29 @@ async function submitForm() {
   }
 }
 
+async function runMatch() {
+  if (!current.value) return
+  matchLoading.value = true
+  try {
+    const data = await invokeAgent('match', { order_id: current.value.id, top_n: 5 })
+    matches.value = data.candidates || []
+    if (!matches.value.length) {
+      ElMessage.warning('暂无可推荐的学生（需有批改产出的能力分）')
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '匹配失败')
+  } finally {
+    matchLoading.value = false
+  }
+}
+
 async function openDetail(row) {
   current.value = row
   detailVisible.value = true
   try {
     const data = await getOrder(row.id)
     bids.value = data.bids
+    matches.value = []
   } catch (error) {
     ElMessage.error(error.message || '加载投标失败')
   }
@@ -237,11 +277,6 @@ async function doAward(bid) {
   }
 }
 
-function logout() {
-  userStore.logout()
-  router.push('/login')
-}
-
 onMounted(async () => {
   if (!userStore.profile) {
     await userStore.fetchMe()
@@ -251,23 +286,18 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page {
-  padding: 20px 24px 40px;
-  max-width: 1080px;
-  margin: 0 auto;
+.empty-guide {
+  padding: 14px 0 8px;
 }
-.head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.title {
+.eg-title {
   margin: 0 0 4px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
-.sub {
-  font-size: 13px;
+.eg-desc {
+  margin: 0 0 12px;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 .bid-card {
@@ -289,5 +319,47 @@ onMounted(async () => {
   margin: 8px 0 0;
   font-size: 13px;
   color: var(--el-text-color-regular);
+}
+
+/* ---------- AI 人才匹配 ---------- */
+.match-card {
+  border: 0.5px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+.match-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.match-alias {
+  font-size: 13px;
+}
+.match-score {
+  margin-left: auto;
+  font-size: 12px;
+  font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+  color: var(--el-color-success);
+  font-weight: 600;
+}
+.match-reason {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  margin-top: 5px;
+  line-height: 1.6;
+}
+.match-dims {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.match-dim {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-light);
+  border-radius: 6px;
+  padding: 2px 7px;
 }
 </style>

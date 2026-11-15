@@ -129,25 +129,6 @@ onMounted(reload)
 </script>
 
 <style scoped>
-.page {
-  padding: 20px 24px 40px;
-  max-width: 1080px;
-  margin: 0 auto;
-}
-.head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-.title {
-  margin: 0 0 4px;
-  font-weight: 500;
-}
-.sub {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
 .brief {
   margin-bottom: 14px;
 }
