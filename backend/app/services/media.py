@@ -23,14 +23,14 @@ class MediaError(Exception):
     """媒体处理失败（ffmpeg 缺失或执行错误）。"""
 
 
-def _run(cmd: list[str], stdin_data: bytes | None = None) -> bytes:
+def _run(cmd: list[str], stdin_data: bytes | None = None, timeout: int = 120) -> bytes:
     try:
         proc = subprocess.run(
             cmd,
             input=stdin_data,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            timeout=120,
+            timeout=timeout,
         )
     except FileNotFoundError as exc:
         raise MediaError(
@@ -229,7 +229,31 @@ def burn_video(
 
         srt_escaped = str(srt_path).replace("\\", "/").replace(":", "\\:")
         out_path = tmp_dir / "output.mp4"
+        # 编码超时随音频时长放大（长剧在 4C VPS 上可能远超固定 120s）：
+        # 图文合成约 0.3-1x 实时，留 3 倍余量 + 60s 装载
+        try:
+            audio_dur_s = float(
+                _run(
+                    [
+                        _FFPROBE,
+                        "-v",
+                        "error",
+                        "-show_entries",
+                        "format=duration",
+                        "-of",
+                        "csv=p=0",
+                        str(audio_path),
+                    ]
+                )
+                .decode()
+                .strip()
+            )
+        except (MediaError, ValueError, IndexError):
+            audio_dur_s = 120.0
+        encode_timeout = max(300, int(audio_dur_s * 3) + 60)
+
         # mp4 muxer 不支持非 seekable 管道输出，落临时文件后再读回
+        # -threads 2：max_jobs=4 并发合成时限制单任务线程，防 4C VPS CPU 争抢
         _run(
             [
                 _FFMPEG,
@@ -256,6 +280,8 @@ def burn_video(
                 "libx264",
                 "-preset",
                 "veryfast",
+                "-threads",
+                "2",
                 "-c:a",
                 "aac",
                 "-b:a",
@@ -264,6 +290,7 @@ def burn_video(
                 "-movflags",
                 "+faststart",
                 str(out_path),
-            ]
+            ],
+            timeout=encode_timeout,
         )
         return out_path.read_bytes()

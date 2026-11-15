@@ -1,13 +1,20 @@
 """认证：注册 / 登录 / 刷新（W1）。
 
 P0 开放注册（无邀请码），P1 再加审核流。
+登录失败防爆破：内存滑窗限流（只计失败尝试，成功清零）。
 """
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import DbSession, unauthorized
+from app.core.ratelimit import (
+    check_login_allowed,
+    login_key,
+    record_login_failure,
+    record_login_success,
+)
 from app.core.responses import ok
 from app.core.security import (
     create_access_token,
@@ -79,16 +86,20 @@ async def register(body: RegisterIn, db: DbSession):
 
 
 @router.post("/login", summary="三端统一登录")
-async def login(body: LoginIn, db: DbSession):
+async def login(body: LoginIn, request: Request, db: DbSession):
+    key = login_key(body.username, request.client.host if request.client else "unknown")
+    check_login_allowed(key)
     user = (
         await db.execute(select(User).where(User.username == body.username))
     ).scalar_one_or_none()
     if user is None or not verify_password(body.password, user.password_hash):
+        record_login_failure(key)
         raise unauthorized("账号或密码错误")
     if user.status != 1:
         raise HTTPException(
             status_code=403, detail={"code": 40301, "message": "账号已被禁用"}
         )
+    record_login_success(key)
     return ok(_issue_tokens(user))
 
 

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.models.agent import AgentCallLog
 
-TEXT_AGENTS = {"script", "storyboard", "translate", "analyze", "optimize", "match"}
+TEXT_AGENTS = {"script", "storyboard", "translate", "analyze", "optimize", "match", "lesson"}
 # 媒体类（全部走媒体配额）：配音、成片合成、发布参数生成
 # 修复记录：compose 曾遗漏在集合外，导致最贵的媒体操作绕过配额（2026-10-16）
 MEDIA_AGENTS = {"tts", "compose", "publish"}
@@ -34,6 +34,9 @@ async def count_today_calls(db: AsyncSession, user_id: int, agent_types: set[str
             AgentCallLog.user_id == user_id,
             AgentCallLog.created_at >= _today_start(),
             AgentCallLog.agent_type.in_(sorted(agent_types)),
+            # 只数成功调用：上游 5xx / 解析失败 / 超时不应扣学生配额
+            # （修复记录：原实现无 status 过滤，失败与 quota_exceeded 日志都计入）
+            AgentCallLog.status == "success",
             # 测试桩（mock 模式）不占用户配额：本地反复联调/彩排不应被限流
             AgentCallLog.provider != "mock",
         )

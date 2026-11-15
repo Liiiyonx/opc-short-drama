@@ -1,8 +1,12 @@
 """智能体注册表：新增智能体 = 加一个类 + 在这里注册一行。"""
 from fastapi import HTTPException
 
+from app.agents.analyze_agent import AnalyzeAgent
 from app.agents.base import Agent
 from app.agents.compose_agent import ComposeAgent
+from app.agents.lesson_agent import LessonAgent
+from app.agents.match_agent import MatchAgent
+from app.agents.optimize_agent import OptimizeAgent
 from app.agents.publish_agent import PublishAgent
 from app.agents.script_agent import ScriptAgent
 from app.agents.storyboard_agent import StoryboardAgent
@@ -16,6 +20,10 @@ AGENTS: dict[str, type[Agent]] = {
     "tts": TTSAgent,
     "compose": ComposeAgent,
     "publish": PublishAgent,
+    "analyze": AnalyzeAgent,
+    "optimize": OptimizeAgent,
+    "match": MatchAgent,
+    "lesson": LessonAgent,
 }
 
 

@@ -13,7 +13,7 @@ from sqlalchemy import select
 from app.agents.orchestrator import sweep_stale_sessions
 from app.core.deps import CurrentUser, DbSession
 from app.core.responses import ok
-from app.models.agent import AgentSession
+from app.models.agent import AgentCallLog, AgentSession
 
 router = APIRouter(prefix="/agent-tasks", tags=["异步任务"])
 
@@ -43,6 +43,29 @@ async def get_agent_task(task_id: int, user: CurrentUser, db: DbSession):
         cleaned = await sweep_stale_sessions(db, session_id=session.id)
         if cleaned:
             await db.refresh(session)
+    # 成本透明：带出该会话的调用日志（tokens/耗时/成本）
+    log = (
+        (
+            await db.execute(
+                select(AgentCallLog)
+                .where(AgentCallLog.session_id == session.id)
+                .order_by(AgentCallLog.id.desc())
+            )
+        )
+        .scalars()
+        .first()
+    )
+    usage = (
+        {
+            "prompt_tokens": log.prompt_tokens,
+            "completion_tokens": log.completion_tokens,
+            "duration_ms": log.duration_ms,
+            "cost_est": float(log.cost_est or 0),
+            "model": log.model,
+        }
+        if log
+        else None
+    )
     return ok(
         {
             "task_id": session.id,
@@ -51,5 +74,6 @@ async def get_agent_task(task_id: int, user: CurrentUser, db: DbSession):
             "status": session.status,
             "result": session.output_json if session.status == "success" else None,
             "error": session.error if session.status == "failed" else None,
+            "usage": usage,
         }
     )

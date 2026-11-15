@@ -117,6 +117,21 @@ async def get_work_detail(
     return work, list(assets), list(versions)
 
 
+async def _storyboard_market(
+    db: AsyncSession, user: User, storyboard: Work
+) -> str | None:
+    """沿分镜 → 剧本回溯目标市场。
+
+    分镜 meta 只存 source_work_id 不存市场（修复记录：配音分支曾直接读
+    storyboard.meta_json["target_market"]，该键不存在导致永远回退中文音色）。
+    """
+    source_id = (storyboard.meta_json or {}).get("source_work_id")
+    if not source_id:
+        return None
+    script_work = await _load_my_work(db, user, source_id)
+    return (script_work.meta_json or {}).get("target_market")
+
+
 def _meta_for(work: Work, result: dict, body: GenerateIn) -> dict:
     data = result["result"]
     if work.type == "script":
@@ -162,6 +177,7 @@ async def generate(
 ) -> tuple[Work, dict]:
     work = await _load_my_work(db, user, work_id)
 
+    source_market = None
     if work.type == "script":
         payload = body.model_dump(exclude_none=True)
         agent_type = "script"
@@ -180,6 +196,7 @@ async def generate(
                 status_code=422,
                 detail={"code": 40001, "message": "source_work_id 必须是剧本作品"},
             )
+        source_market = (source.meta_json or {}).get("target_market")
         outline = await _latest_json_asset(db, source.id)
         if outline is None:
             raise HTTPException(
@@ -229,11 +246,7 @@ async def generate(
                 detail={"code": 40901, "message": "分镜作品没有产物，请先执行分镜生成"},
             )
         # 目标市场沿链回溯剧本作品（分镜 meta 不存市场）
-        target_market = None
-        source_id = (storyboard.meta_json or {}).get("source_work_id")
-        if source_id:
-            script_work = await _load_my_work(db, user, source_id)
-            target_market = (script_work.meta_json or {}).get("target_market")
+        target_market = await _storyboard_market(db, user, storyboard)
         lines = [
             {
                 "line_id": shot.get("shot_no", index + 1),
@@ -275,8 +288,9 @@ async def generate(
                 status_code=409,
                 detail={"code": 40901, "message": "分镜作品没有产物，请先执行分镜生成"},
             )
+        # 语言默认沿链回溯目标市场（北美 → en-US）；显式 body.lang 优先
         lang = body.lang or market_to_lang(
-            (storyboard.meta_json or {}).get("target_market")
+            await _storyboard_market(db, user, storyboard)
         )
         lines = [
             {
@@ -353,10 +367,15 @@ async def generate(
         await db.commit()
         return work, result
 
+    meta = _meta_for(work, result, body)
+    # 分镜 meta 补记目标市场（数据血缘：下游配音/翻译可直接读取，无需回溯）
+    if agent_type == "storyboard" and source_market:
+        meta["target_market"] = source_market
+
     if work.status == "draft" and work.version == 1:
         target = work
         target.status = "ready"
-        target.meta_json = _meta_for(work, result, body)
+        target.meta_json = meta
     else:
         target = Work(
             owner_type=work.owner_type,
@@ -367,7 +386,7 @@ async def generate(
             version=work.version + 1,
             parent_id=work.id,
             status="ready",
-            meta_json=_meta_for(work, result, body),
+            meta_json=meta,
             created_by=user.id,
         )
         db.add(target)

@@ -20,6 +20,8 @@ engine = create_async_engine(
     settings.database_url,
     echo=False,
     pool_pre_ping=True,
+    # MySQL wait_timeout 期间连接被服务端静默断开：定期回收避免拿到死连接
+    pool_recycle=3600,
 )
 
 AsyncSessionLocal = async_sessionmaker(

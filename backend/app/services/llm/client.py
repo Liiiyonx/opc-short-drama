@@ -46,6 +46,10 @@ class LLMUpstreamError(LLMError):
     """上游不可用 / 返回异常。"""
 
 
+class LLMClientError(LLMUpstreamError):
+    """上游明确拒绝（4xx 非 429）：重试无意义，立即抛出（如密钥无效/参数错误）。"""
+
+
 @dataclass
 class LLMReply:
     content: str
@@ -162,9 +166,11 @@ async def chat_completion(
             client = _get_client(settings.llm_timeout_seconds)
             response = await client.post(url, json=body, headers=headers)
             if response.status_code != 200:
-                raise LLMUpstreamError(
-                    f"LLM 上游返回 HTTP {response.status_code}: {response.text[:200]}"
-                )
+                # 分类：429/5xx/408 值得重试；其余 4xx（401 密钥无效 / 400 参数错）立即失败
+                message = f"LLM 上游返回 HTTP {response.status_code}: {response.text[:200]}"
+                if response.status_code in (408, 429) or response.status_code >= 500:
+                    raise LLMUpstreamError(message)
+                raise LLMClientError(message)
             data = response.json()
             content = data["choices"][0]["message"]["content"]
             usage = data.get("usage") or {}
@@ -178,6 +184,7 @@ async def chat_completion(
                 },
             )
         except (httpx.HTTPError, LLMUpstreamError, KeyError, ValueError) as exc:
+            # LLMClientError（4xx 非 429）不在捕获范围：立即上抛，不做无谓重试
             last_error = exc
             if attempt < settings.llm_max_retries:
                 await asyncio.sleep(1.5 * (attempt + 1))

@@ -51,12 +51,12 @@ async def db(tmp_path, monkeypatch):
     await engine.dispose()
 
 
-def _log(session, user, agent_type, provider):
+def _log(session, user, agent_type, provider, status="success"):
     row = AgentCallLog(
         user_id=user.id,
         agent_type=agent_type,
         provider=provider,
-        status="success",
+        status=status,
         created_at=datetime.now(),
     )
     session.add(row)
@@ -84,3 +84,19 @@ async def test_real_calls_consume_quota_and_block_at_limit(db):
 
     # 文本类独立计数
     assert await count_today_calls(session, user.id, TEXT_AGENTS) == 0
+
+
+async def test_failed_and_quota_exceeded_calls_do_not_consume_quota(db):
+    """失败（上游 5xx/超时/解析失败）与 quota_exceeded 日志不占配额。"""
+    session, user = db
+    _log(session, user, "tts", "edge-tts", status="failed")
+    _log(session, user, "tts", "edge-tts", status="timeout")
+    _log(session, user, "script", "openai_compat", status="failed")
+    _log(session, user, "script", "", status="quota_exceeded")
+    await session.commit()
+
+    assert await count_today_calls(session, user.id, MEDIA_AGENTS) == 0
+    assert await count_today_calls(session, user.id, TEXT_AGENTS) == 0
+    # 失败若干次后仍可调用（配额未被失败烧掉）
+    await ensure_quota(session, user.id, "tts")
+    await ensure_quota(session, user.id, "script")

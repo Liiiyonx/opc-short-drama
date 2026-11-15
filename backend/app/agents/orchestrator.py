@@ -106,19 +106,35 @@ async def invoke_agent(
     except LLMError as exc:
         await _finish_failed(db, session, str(exc))
         raise HTTPException(status_code=502, detail={"code": 50002, "message": str(exc)})
+    except HTTPException:
+        # 智能体主动表达的 HTTP 语义（如 403 权限）：原样透传，不吞成 500
+        await _finish_failed(db, session, "请求未通过智能体前置校验")
+        raise
     except Exception as exc:
         await _finish_failed(db, session, f"智能体执行失败：{exc}")
         raise HTTPException(
             status_code=500,
             detail={"code": 50001, "message": "智能体执行失败，请稍后重试"},
         )
-    await _finish_success(
-        db, session, result, ctx, int((time.perf_counter() - started) * 1000)
-    )
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    await _finish_success(db, session, result, ctx, duration_ms)
+    usage = ctx.usage or {}
+    prompt_tokens = int(usage.get("prompt_tokens", 0))
+    completion_tokens = int(usage.get("completion_tokens", 0))
     return {
         "session_id": session.id,
         "agent_type": agent_type,
         "result": result.model_dump(mode="json"),
+        # 成本透明（Langfuse 式）：每次调用的 tokens/耗时/成本直接带回前端展示
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "duration_ms": duration_ms,
+            "cost_est": float(
+                estimate_cost_cny(usage.get("model", ""), prompt_tokens, completion_tokens)
+            ),
+            "model": usage.get("model", ""),
+        },
     }
 
 

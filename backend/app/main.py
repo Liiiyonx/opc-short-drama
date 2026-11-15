@@ -15,19 +15,30 @@ from app.api.v1 import (
     ability,
     agent_tasks,
     agents,
+    analytics,
     auth,
     courses,
     files,
     orders,
+    portfolio,
     tasks,
     users,
     works,
 )
 from app.core.config import get_settings
+from app.core.middleware import AccessLogMiddleware
 
 logger = logging.getLogger("opc.main")
 
 settings = get_settings()
+
+# CORS 策略：显式配置优先；prod 未配置 = 同源部署不开放跨域；dev 放开（vite 5173 → 8000）
+if settings.cors_origins.strip():
+    cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+elif settings.opc_env == "prod":
+    cors_origins = []
+else:
+    cors_origins = ["*"]
 
 
 @asynccontextmanager
@@ -63,10 +74,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # P0 开发期放开；生产收敛到三端子域名
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# 纯 ASGI 访问日志 + X-Request-ID（add_middleware 包一层，仍是 ASGI 直通）
+app.add_middleware(AccessLogMiddleware)
 
 
 @app.exception_handler(HTTPException)
@@ -96,8 +109,54 @@ app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(ability.router, prefix="/api/v1")
 app.include_router(courses.router, prefix="/api/v1")
 app.include_router(orders.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(portfolio.router, prefix="/api/v1")
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"code": 0, "message": "ok", "data": {"status": "up", "app": settings.app_name}}
+    """深度健康检查：DB / Redis 连通性（降级仍返回 200，便于编排层不抖动）。"""
+    import asyncio
+
+    from sqlalchemy import text
+
+    db_status, redis_status = "up", "up"
+    try:
+        from app.db.session import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as db:
+            await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=2)
+    except Exception:  # noqa: BLE001
+        db_status = "down"
+    try:
+        from urllib.parse import urlparse
+
+        import redis.asyncio as aioredis
+
+        parsed = urlparse(settings.redis_url)
+        r = aioredis.from_url(
+            settings.redis_url,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+            password=parsed.password,
+        )
+        try:
+            await asyncio.wait_for(r.ping(), timeout=2)
+        finally:
+            await r.aclose()
+    except Exception:  # noqa: BLE001
+        redis_status = "down"
+
+    status = "up" if db_status == "up" and redis_status == "up" else "degraded"
+    if status != "up":
+        logger.warning("健康检查降级：db=%s redis=%s", db_status, redis_status)
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {
+            "status": status,
+            "db": db_status,
+            "redis": redis_status,
+            "app": settings.app_name,
+        },
+    }

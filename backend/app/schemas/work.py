@@ -53,12 +53,12 @@ class RevisionIn(BaseModel):
     """人工修订产物（初终稿差异比对：字幕校轴等）。"""
 
     kind: str = Field(default="srt", pattern="^(srt|text)$")
-    content: str = Field(min_length=1)
+    content: str = Field(min_length=1, max_length=2_000_000)
 
 
 class TextAssetIn(BaseModel):
     kind: str = Field(pattern="^(text|json|srt)$")
-    content: str
+    content: str = Field(max_length=2_000_000)  # 2MB 文本上限（防超大 JSON 打爆内存）
     filename: str | None = None
 
 

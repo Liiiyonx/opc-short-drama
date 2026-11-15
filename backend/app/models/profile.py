@@ -22,6 +22,10 @@ class StudentProfile(Base):
         BigInteger, ForeignKey("course_classes.id"), nullable=True
     )
     ability_json: Mapped[dict | None] = mapped_column(JSONType, nullable=True)
+    # 作品集对外分享令牌（脱敏链接 /share/{token}；首次分享时生成）
+    portfolio_token: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, unique=True, index=True
+    )
 
 
 class TeacherProfile(Base):

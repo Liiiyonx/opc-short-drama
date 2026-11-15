@@ -5,6 +5,7 @@
 """
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.order import OrderBid, WorkOrder
@@ -189,7 +190,12 @@ async def bid_order(
     db.add(bid)
     if order.status == "published":
         order.status = "bidding"
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # 并发双击投标：唯一约束 uq_order_bids_order_bidder 兜底（check-then-write 有竞态）
+        await db.rollback()
+        raise _conflict("你已投标该工单，如需修改请联系企业方")
     await db.refresh(bid)
     return bid, average
 
@@ -205,7 +211,14 @@ async def list_bids(db: AsyncSession, user: User, order_id: int) -> list[dict]:
 async def award_order(
     db: AsyncSession, user: User, order_id: int, bid_id: int
 ) -> tuple[WorkOrder, OrderBid]:
-    order = await _load_order(db, order_id)
+    # 行锁串行化定标：并发两次 award 都能过"bidding"检查 → 双重定标（MySQL 生效）
+    order = (
+        await db.execute(
+            select(WorkOrder).where(WorkOrder.id == order_id).with_for_update()
+        )
+    ).scalar_one_or_none()
+    if order is None:
+        raise _not_found()
     _require_owner(order, user)
     if order.status != "bidding":
         raise _conflict("工单不在评标状态")

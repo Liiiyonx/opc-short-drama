@@ -210,3 +210,142 @@ def test_storyboard_episode_out_of_range(client):
 def test_files_requires_auth(client):
     resp = client.get("/api/v1/files/works/1/json/x.json")
     assert resp.status_code == 401
+
+
+def test_upload_rejects_bad_extension(client):
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    work = client.post(
+        "/api/v1/works", json={"title": "剧", "type": "script"}, headers=headers
+    ).json()["data"]
+    resp = client.post(
+        f"/api/v1/works/{work['id']}/assets",
+        files={"file": ("payload.exe", b"MZ...", "application/octet-stream")},
+        data={"kind": "image"},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+    assert "文件类型" in resp.json()["message"]
+
+
+def test_upload_rejects_oversize(client, monkeypatch):
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    monkeypatch.setenv("UPLOAD_MAX_MB", "1")
+    get_settings.cache_clear()
+    try:
+        work = client.post(
+            "/api/v1/works", json={"title": "剧", "type": "script"}, headers=headers
+        ).json()["data"]
+        resp = client.post(
+            f"/api/v1/works/{work['id']}/assets",
+            files={"file": ("big.png", b"x" * (2 * 1024 * 1024), "image/png")},
+            data={"kind": "image"},
+            headers=headers,
+        )
+        assert resp.status_code == 413
+        assert "上限" in resp.json()["message"]
+    finally:
+        monkeypatch.delenv("UPLOAD_MAX_MB")
+        get_settings.cache_clear()
+
+
+def test_file_range_requests(client):
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    work = client.post(
+        "/api/v1/works", json={"title": "剧", "type": "script"}, headers=headers
+    ).json()["data"]
+    body = bytes(range(256)) * 4  # 1024 字节
+    resp = client.post(
+        f"/api/v1/works/{work['id']}/assets",
+        files={"file": ("range-test.png", body, "image/png")},
+        data={"kind": "image"},
+        headers=headers,
+    )
+    url = resp.json()["data"]["url"]
+
+    # 整文件
+    resp = client.get(url, headers=headers)
+    assert resp.status_code == 200
+    assert resp.content == body
+    assert resp.headers["accept-ranges"] == "bytes"
+
+    # 单段 Range：bytes=0-9
+    resp = client.get(url, headers={**headers, "Range": "bytes=0-9"})
+    assert resp.status_code == 206
+    assert resp.content == body[:10]
+    assert resp.headers["content-range"] == f"bytes 0-9/{len(body)}"
+
+    # 开区间：bytes=1000-
+    resp = client.get(url, headers={**headers, "Range": "bytes=1000-"})
+    assert resp.status_code == 206
+    assert resp.content == body[1000:]
+
+    # 尾部：bytes=-24
+    resp = client.get(url, headers={**headers, "Range": "bytes=-24"})
+    assert resp.status_code == 206
+    assert resp.content == body[-24:]
+
+    # 起点越界 → 416
+    resp = client.get(url, headers={**headers, "Range": "bytes=999999-"})
+    assert resp.status_code == 416
+
+
+def test_audio_lang_backtracks_to_script_market(client, monkeypatch):
+    """北美剧本 → 分镜 → 配音：不传 lang 应回溯 en-US（修复：原实现永远 zh-CN）。"""
+    from app.services import works as works_service
+
+    token = _login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    script = client.post(
+        "/api/v1/works", json={"title": "剧", "type": "script"}, headers=headers
+    ).json()["data"]
+    client.post(
+        f"/api/v1/works/{script['id']}/generate",
+        json={"genre": "逆袭", "target_market": "北美", "episodes": 1},
+        headers=headers,
+    )
+    sb = client.post(
+        "/api/v1/works", json={"title": "分镜", "type": "storyboard"}, headers=headers
+    ).json()["data"]
+    client.post(
+        f"/api/v1/works/{sb['id']}/generate",
+        json={"source_work_id": script["id"], "episode": 1},
+        headers=headers,
+    )
+    # 数据血缘：分镜 meta 补记目标市场
+    sb_detail = client.get(f"/api/v1/works/{sb['id']}", headers=headers).json()["data"]
+    assert sb_detail["work"]["meta_json"]["target_market"] == "北美"
+
+    # 只拦截 tts（异步智能体，测试环境无 Redis），其余走真实 mock 调用
+    from app.agents.orchestrator import invoke_agent as real_invoke
+
+    captured = {}
+
+    async def fake_invoke(agent_type, payload, user, db, work_id=None):
+        if agent_type != "tts":
+            return await real_invoke(
+                agent_type, payload, user=user, db=db, work_id=work_id
+            )
+        captured["payload"] = payload
+        return {
+            "session_id": 999,
+            "agent_type": agent_type,
+            "async": True,
+            "status": "running",
+        }
+
+    monkeypatch.setattr(works_service, "invoke_agent", fake_invoke)
+    audio = client.post(
+        "/api/v1/works", json={"title": "配音", "type": "audio"}, headers=headers
+    ).json()["data"]
+    resp = client.post(
+        f"/api/v1/works/{audio['id']}/generate",
+        json={"storyboard_work_id": sb["id"]},  # 不传 lang → 回溯市场
+        headers=headers,
+    )
+    assert resp.status_code == 200, resp.text
+    assert captured["payload"]["lines"], "应提取台词行"
+    assert captured["payload"]["lines"][0]["lang"] == "en-US"

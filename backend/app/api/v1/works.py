@@ -1,6 +1,7 @@
 """作品与资产 API（W3）+ Rubric 批改入口（W6）。"""
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
+from app.core.config import get_settings
 from app.core.deps import CurrentUser, DbSession, require_role
 from app.core.responses import ok
 from app.models.work import WorkAsset
@@ -19,6 +20,37 @@ from app.services import tasks as tasks_service
 from app.services import works as works_service
 from app.services.storage.factory import get_storage
 from sqlalchemy import select
+
+_UPLOAD_CHUNK = 1024 * 1024  # 1MB 分块读取，超限即中断
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    """分块读取上传内容：类型白名单 + 大小上限（服务端兜底，勿只依赖 nginx）。"""
+    settings = get_settings()
+    filename = file.filename or ""
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    allowed = {e.strip().lower() for e in settings.upload_allowed_ext.split(",") if e.strip()}
+    if ext and allowed and ext not in allowed:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": 40001,
+                "message": f"不支持的文件类型 .{ext}，允许：{settings.upload_allowed_ext}",
+            },
+        )
+    limit = settings.upload_max_mb * 1024 * 1024
+    buf = bytearray()
+    while chunk := await file.read(_UPLOAD_CHUNK):
+        buf.extend(chunk)
+        if len(buf) > limit:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "code": 41301,
+                    "message": f"文件超过上传上限 {settings.upload_max_mb}MB",
+                },
+            )
+    return bytes(buf)
 
 
 def _work_dict(work) -> dict:
@@ -96,6 +128,7 @@ async def generate_work(
         {
             "session_id": result.get("session_id"),
             "result": result.get("result"),
+            "usage": result.get("usage"),
         }
     )
     return ok(data, "生成成功")
@@ -109,7 +142,7 @@ async def upload_asset(
     file: UploadFile = File(...),
     kind: str = Form(...),
 ):
-    data = await file.read()
+    data = await _read_upload(file)
     asset = await works_service.add_file_asset(
         db,
         user,
@@ -207,6 +240,7 @@ async def create_publish_params(
             "work_id": work.id,
             "session_id": result.get("session_id"),
             "result": result.get("result"),
+            "usage": result.get("usage"),
         },
         "发布参数已生成",
     )

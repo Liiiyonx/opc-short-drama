@@ -357,8 +357,12 @@ def _require_review_permission(work: Work, task: TrainingTask | None, user: User
 async def review_work(
     db: AsyncSession, user: User, work_id: int, body: ReviewIn
 ) -> dict:
+    # 行锁串行化同一作品的批改：防双击/并发提交产生重复评分与快照
+    # （SQLite 忽略 FOR UPDATE，MySQL 生效；双保险是下面的同教师 upsert）
     work = (
-        await db.execute(select(Work).where(Work.id == work_id))
+        await db.execute(
+            select(Work).where(Work.id == work_id).with_for_update()
+        )
     ).scalar_one_or_none()
     if work is None:
         raise _not_found("作品不存在")
@@ -403,20 +407,27 @@ async def review_work(
         "measured" if measured is not None else ("declared" if declared is not None else None)
     )
 
-    review = WorkReview(
-        work_id=work.id,
-        teacher_id=user.id,
-        rubric_score_json={
-            "total": round(total, 2),
-            "pass_score": rubric.get("pass_score", 60),
-            "passed": total >= float(rubric.get("pass_score", 60)),
-            "items": detail_scores,
-            "edit_ratio_source": edit_ratio_source,
-        },
-        comment=body.comment,
-        ai_diff_ratio=ai_diff_ratio,
-    )
-    db.add(review)
+    # 同教师对同作品重复批改 = 修订评分（更新原记录，不重复入库）
+    review = (
+        await db.execute(
+            select(WorkReview).where(
+                WorkReview.work_id == work.id,
+                WorkReview.teacher_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if review is None:
+        review = WorkReview(work_id=work.id, teacher_id=user.id)
+        db.add(review)
+    review.rubric_score_json = {
+        "total": round(total, 2),
+        "pass_score": rubric.get("pass_score", 60),
+        "passed": total >= float(rubric.get("pass_score", 60)),
+        "items": detail_scores,
+        "edit_ratio_source": edit_ratio_source,
+    }
+    review.comment = body.comment
+    review.ai_diff_ratio = ai_diff_ratio
     await db.flush()
 
     # 逐维能力快照（只追加）；同一维度多次评分取最新为该维当前分

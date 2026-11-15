@@ -82,5 +82,7 @@ class WorkerSettings:
     on_startup = _sweep_on_startup
     redis_settings = _redis_settings()
     max_jobs = 4
-    job_timeout = 600  # 秒；视频合成留足时间
+    # 单任务上限 25 分钟；须 < AGENT_TASK_TIMEOUT_SECONDS(默认 1800)：
+    # job 被杀后会按 max_tries 重试，清扫阈值更大才能保证「重试→仍超时→判失败」闭环
+    job_timeout = 1500
     max_tries = 2  # 瞬态故障（如 DB 抖动）允许重试一轮；execute_session 幂等（非 running 直接跳过）

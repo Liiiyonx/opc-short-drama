@@ -1,0 +1,15 @@
+# 密钥与本地数据绝不进镜像（COPY . . 只带走业务代码）
+.env
+*.env
+dev.db
+*.db
+storage/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+conftest.py
