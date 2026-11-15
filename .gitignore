@@ -12,11 +12,11 @@ venv/
 *.env
 !.env.example
 
-# 数据库与本地存储
+# 数据库与本地存储（锚定路径，勿用裸名——否则误杀 app/services/storage 源码包）
 *.db
 *.sqlite3
-backend/storage/
-storage/
+/storage/
+/backend/storage/
 
 # Node
 node_modules/
