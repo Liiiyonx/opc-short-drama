@@ -152,14 +152,6 @@ bash deploy/backup.sh   # 数据备份（MySQL + MinIO，滚动保留 7 份，�
 └── .github/workflows/ci.yml # CI
 ```
 
-## 🗺️ Roadmap
-
-- [ ] 半自动发布（平台 API 凭据接入后，当前为发布参数包）
-- [ ] 素材库联动 + 分镜图生成
-- [ ] 可视化编排画布（Dify 式）
-- [ ] 用量按班级/课程聚合、产教数据看板
-- [ ] CosyVoice 自托管音色
-
 ## 📖 文档索引
 
 | 文档 | 内容 |
