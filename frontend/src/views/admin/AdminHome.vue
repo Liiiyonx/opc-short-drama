@@ -64,6 +64,38 @@
           </el-table-column>
         </el-table>
       </el-tab-pane>
+
+      <el-tab-pane label="系统健康" name="health">
+        <!-- P0-10：管理员系统级可观测（worker 心跳/依赖/AI 模式） -->
+        <div class="toolbar">
+          <el-tag :type="healthTagType(health && health.status)" size="large" effect="dark" round>
+            {{ health && health.status === 'up' ? '系统正常' : health && health.status === 'degraded' ? '降级运行' : '故障' }}
+          </el-tag>
+          <el-button size="small" @click="loadHealth">刷新</el-button>
+          <span class="count-hint">自动刷新 15s · 采样于 {{ formatHealthTime(health && health.checked_at) }}</span>
+        </div>
+        <el-row :gutter="12" class="health-grid">
+          <el-col v-for="item in healthItems" :key="item.key" :xs="12" :sm="8" :md="6">
+            <el-card shadow="never" class="health-card">
+              <div class="health-inner">
+                <span class="dot" :class="healthDotClass(item.value)"></span>
+                <div>
+                  <div class="health-name">{{ item.label }}</div>
+                  <div class="health-value">{{ item.display }}</div>
+                </div>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+        <el-alert
+          v-if="health && health.worker !== 'up'"
+          type="warning"
+          :closable="false"
+          show-icon
+          title="worker 心跳缺失：配音/成片等异步任务将停摆，请检查 arq worker 进程"
+          class="health-alert"
+        />
+      </el-tab-pane>
     </el-tabs>
 
     <el-dialog v-model="userDialog" title="新建用户" width="440px">
@@ -118,10 +150,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
-import { createCourse, createUser, listCourses, listUsers, updateUserStatus } from '../../api/index.js'
+import { createCourse, createUser, getSystemHealth, listCourses, listUsers, updateUserStatus } from '../../api/index.js'
 import { useUserStore } from '../../stores/user.js'
 
 const ROLE_LABELS = { student: '学生', teacher: '教师', enterprise: '企业', admin: '管理员' }
@@ -264,10 +296,67 @@ async function onCreateCourse() {
 onMounted(async () => {
   loading.value = true
   try {
-    await Promise.all([loadUsers(), loadCourses()])
+    await Promise.all([loadUsers(), loadCourses(), loadHealth()])
   } finally {
     loading.value = false
   }
+})
+
+// ---------- P0-10 系统健康 ----------
+const health = ref(null)
+let healthTimer = null
+
+const healthItems = computed(() => {
+  const h = health.value
+  if (!h) return []
+  return [
+    { key: 'db', label: '数据库', value: h.db, display: h.db === 'up' ? '正常' : '不可用' },
+    { key: 'redis', label: 'Redis 队列', value: h.redis, display: h.redis === 'up' ? '正常' : '不可用' },
+    { key: 'worker', label: 'Worker 心跳', value: h.worker, display: h.worker === 'up' ? '在线' : '失联' },
+    { key: 'storage', label: '对象存储', value: h.storage, display: h.storage === 'up' ? '正常' : '不可用' },
+    { key: 'ffmpeg', label: 'ffmpeg', value: h.ffmpeg, display: h.ffmpeg === 'up' ? '可用' : '缺失' },
+    {
+      key: 'ai',
+      label: 'AI 模式',
+      value: h.ai && h.ai.llm_provider === 'openai_compat' ? 'up' : 'mock',
+      display: h.ai ? `${h.ai.llm_provider === 'openai_compat' ? '真实' : '确定性演示'} · ${h.ai.llm_model}` : '—'
+    }
+  ]
+})
+
+function healthDotClass(value) {
+  if (value === 'up') return 'dot-up'
+  if (value === 'mock') return 'dot-warn' // mock 是显式演示模式，不是故障
+  return 'dot-down'
+}
+
+function healthTagType(status) {
+  if (status === 'up') return 'success'
+  if (status === 'degraded') return 'warning'
+  return 'danger'
+}
+
+function formatHealthTime(seconds) {
+  if (!seconds) return '—'
+  return new Date(seconds * 1000).toLocaleTimeString('zh-CN', { hour12: false })
+}
+
+async function loadHealth() {
+  try {
+    health.value = await getSystemHealth()
+  } catch {
+    health.value = null
+  }
+}
+
+onMounted(() => {
+  healthTimer = window.setInterval(() => {
+    if (activeTab.value === 'health') loadHealth()
+  }, 15000)
+})
+
+onBeforeUnmount(() => {
+  if (healthTimer) window.clearInterval(healthTimer)
 })
 </script>
 
@@ -289,5 +378,46 @@ onMounted(async () => {
 .muted {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+.health-grid {
+  margin-top: 4px;
+}
+.health-card {
+  margin-bottom: 12px;
+}
+.health-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-up {
+  background: #67c23a;
+  box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.18);
+}
+.dot-down {
+  background: #f56c6c;
+  box-shadow: 0 0 0 3px rgba(245, 108, 108, 0.18);
+}
+.dot-warn {
+  background: #e6a23c;
+  box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.18);
+}
+.health-name {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.health-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.health-alert {
+  margin-top: 4px;
 }
 </style>

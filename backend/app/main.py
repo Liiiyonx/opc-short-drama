@@ -3,6 +3,11 @@
 W1：健康检查 + 认证路由（auth / users）。
 后续按 docs/04-API设计.md 挂载 works / pipeline / tasks / orders / ability。
 启动时清扫上次进程遗留的 running 会话（worker 崩溃/重启兜底）。
+
+健康检查三档（P0-01）：
+- /livez  进程存活，永不依赖外部组件；
+- /readyz DB + Redis 必须可用，否则 503（Compose 就绪探针用这个）；
+- /health 全量诊断报告（worker 心跳 / 存储 / ffmpeg / AI 模式）。
 """
 import logging
 from contextlib import asynccontextmanager
@@ -67,8 +72,8 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
-    description="三端 + 一中枢 + 八智能体的 OPC 短剧出海产教融合平台（P0-MVP）",
+    version="1.0.0",
+    description="三端 + 一中枢 + 十智能体的 OPC 短剧出海产教融合平台",
     lifespan=lifespan,
 )
 
@@ -113,50 +118,38 @@ app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(portfolio.router, prefix="/api/v1")
 
 
-@app.get("/health")
-async def health() -> dict:
-    """深度健康检查：DB / Redis 连通性（降级仍返回 200，便于编排层不抖动）。"""
-    import asyncio
+@app.get("/livez", summary="存活探针：进程在即 200，不依赖任何外部组件")
+async def livez() -> dict:
+    return {"code": 0, "message": "alive", "data": {"status": "alive"}}
 
-    from sqlalchemy import text
 
-    db_status, redis_status = "up", "up"
-    try:
-        from app.db.session import AsyncSessionLocal
+@app.get("/readyz", summary="就绪探针：DB/Redis 任一不可用即 503（编排层据此摘除实例）")
+async def readyz():
+    from app.core.health import readiness
 
-        async with AsyncSessionLocal() as db:
-            await asyncio.wait_for(db.execute(text("SELECT 1")), timeout=2)
-    except Exception:  # noqa: BLE001
-        db_status = "down"
-    try:
-        from urllib.parse import urlparse
-
-        import redis.asyncio as aioredis
-
-        parsed = urlparse(settings.redis_url)
-        r = aioredis.from_url(
-            settings.redis_url,
-            socket_connect_timeout=2,
-            socket_timeout=2,
-            password=parsed.password,
+    ready, detail = await readiness()
+    if not ready:
+        logger.warning("就绪探针失败：%s", detail)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": 50301,
+                "message": "依赖不可用，实例未就绪",
+                "data": {"status": "not_ready", **detail},
+            },
         )
-        try:
-            await asyncio.wait_for(r.ping(), timeout=2)
-        finally:
-            await r.aclose()
-    except Exception:  # noqa: BLE001
-        redis_status = "down"
+    return {"code": 0, "message": "ready", "data": {"status": "ready", **detail}}
 
-    status = "up" if db_status == "up" and redis_status == "up" else "degraded"
-    if status != "up":
-        logger.warning("健康检查降级：db=%s redis=%s", db_status, redis_status)
+
+@app.get("/health", summary="全量诊断：DB/Redis/worker 心跳/存储/ffmpeg/AI 模式")
+async def health() -> dict:
+    from app.core.health import full_report
+
+    report = await full_report()
+    if report["status"] != "up":
+        logger.warning("健康诊断降级：%s", {k: v for k, v in report.items() if k != "ai"})
     return {
         "code": 0,
         "message": "ok",
-        "data": {
-            "status": status,
-            "db": db_status,
-            "redis": redis_status,
-            "app": settings.app_name,
-        },
+        "data": {"app": settings.app_name, "version": "1.0.0", **report},
     }

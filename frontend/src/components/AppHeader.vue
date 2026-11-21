@@ -189,4 +189,37 @@ function toggleTheme() {
 :global(html.dark) .brand .name {
   color: #f3f4f6;
 }
+
+/* ---------- P0-07 移动端：拆分为品牌行 + 账号行，消除重叠 ---------- */
+@media (max-width: 640px) {
+  .app-header-inner {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 16px;
+    row-gap: 4px;
+  }
+  .brand {
+    flex: 1;
+    min-width: 0;
+  }
+  .name {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 52vw;
+  }
+  .right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  /* 触控目标 ≥ 40px */
+  .theme-toggle {
+    width: 38px;
+    height: 38px;
+  }
+  .right :deep(.el-button) {
+    min-height: 38px;
+  }
+}
 </style>

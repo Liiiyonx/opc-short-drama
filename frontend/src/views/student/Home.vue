@@ -14,7 +14,7 @@
     </div>
 
     <el-row :gutter="12" class="stat-row">
-      <el-col :span="6" v-for="stat in stats" :key="stat.key">
+      <el-col :xs="12" :sm="6" v-for="stat in stats" :key="stat.key">
         <el-card shadow="never" class="stat-card">
           <div class="stat-inner">
             <span class="stat-icon" :class="stat.cls" v-html="stat.icon"></span>
@@ -28,10 +28,11 @@
     </el-row>
 
     <el-row :gutter="12" class="mid-row">
-      <el-col :span="14">
+      <el-col :xs="24" :md="14">
         <el-card shadow="never" class="mid-card">
           <template #header><span>我的任务</span></template>
-          <el-table :data="tasks" size="small" empty-text="暂时没有进行中的实训任务">
+          <!-- P0-07：桌面端表格 / 移动端卡片双形态，移动端不再压扁列 -->
+          <el-table v-if="!isMobile" :data="tasks" size="small" empty-text="暂时没有进行中的实训任务">
             <el-table-column prop="title" label="任务" min-width="150" show-overflow-tooltip />
             <el-table-column label="截止" width="120">
               <template #default="{ row }">{{ row.deadline ? String(row.deadline).slice(5, 16).replace('T', ' ') : '不限' }}</template>
@@ -54,9 +55,31 @@
               </template>
             </el-table-column>
           </el-table>
+          <template v-else>
+            <el-empty v-if="!tasks.length" description="暂时没有进行中的实训任务" :image-size="60" />
+            <div v-for="task in tasks" :key="task.id" class="task-card">
+              <div class="task-card-main">
+                <p class="task-card-title">{{ task.title }}</p>
+                <p class="task-card-meta">
+                  截止 {{ task.deadline ? String(task.deadline).slice(5, 16).replace('T', ' ') : '不限' }}
+                </p>
+              </div>
+              <div class="task-card-side">
+                <el-tag v-if="task.my_status === 'reviewed'" size="small" type="success">已批改</el-tag>
+                <el-tag v-else-if="task.my_status === 'submitted'" size="small" type="warning">待批改</el-tag>
+                <el-tag v-else size="small" type="info">未提交</el-tag>
+                <el-button
+                  size="small"
+                  type="primary"
+                  :disabled="task.my_status === 'submitted' || task.my_status === 'reviewed'"
+                  @click="openSubmit(task)"
+                >提交</el-button>
+              </div>
+            </div>
+          </template>
         </el-card>
       </el-col>
-      <el-col :span="10">
+      <el-col :xs="24" :md="10">
         <el-card shadow="never" class="mid-card">
           <template #header>
             <span>我的能力</span>
@@ -110,7 +133,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="newDialog" title="新建剧集" width="420px">
+    <el-dialog v-model="newDialog" title="新建剧集" :width="isMobile ? '94vw' : '420px'">
       <el-form label-width="72px">
         <el-form-item label="剧名">
           <el-input v-model="newTitle" placeholder="如：外卖箱里的秘密" maxlength="50" />
@@ -121,7 +144,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="submitDialog" :title="`提交作品：${submitTarget ? submitTarget.title : ''}`" width="520px">
+    <el-dialog v-model="submitDialog" :title="`提交作品：${submitTarget ? submitTarget.title : ''}`" :width="isMobile ? '94vw' : '520px'">
       <p class="submit-tip">选择要提交的作品（可多选），提交后教师将按 Rubric 批改并更新你的五维能力。</p>
       <el-checkbox-group v-model="submitWorkIds" class="submit-works">
         <el-checkbox v-for="work in readyWorks" :key="work.id" :label="work.id" border>
@@ -138,7 +161,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -185,6 +208,12 @@ const STATUS_LABELS = {
 const userStore = useUserStore()
 const workStore = useWorkStore()
 const router = useRouter()
+
+// P0-07：≤640px 视为移动端——任务表格切卡片、对话框全宽、能力条全宽
+const isMobile = ref(window.matchMedia('(max-width: 640px)').matches)
+function onViewportChange(e) {
+  isMobile.value = e.matches
+}
 
 const newDialog = ref(false)
 const newTitle = ref('')
@@ -326,12 +355,17 @@ async function reload() {
 }
 
 onMounted(async () => {
+  window.matchMedia('(max-width: 640px)').addEventListener('change', onViewportChange)
   if (!userStore.profile) {
     await userStore.fetchMe()
   }
   await reload()
   await loadTasks()
   await loadAbility()
+})
+
+onBeforeUnmount(() => {
+  window.matchMedia('(max-width: 640px)').removeEventListener('change', onViewportChange)
 })
 </script>
 
@@ -434,5 +468,80 @@ onMounted(async () => {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   margin-top: 2px;
+}
+
+/* ---------- P0-07 移动端适配（≤640px） ---------- */
+.task-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.task-card:last-of-type {
+  border-bottom: none;
+}
+.task-card-main {
+  min-width: 0;
+}
+.task-card-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-card-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.task-card-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .head .actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  /* 触控目标 ≥ 44px（首行主操作按钮） */
+  .head :deep(.el-button) {
+    width: 100%;
+    margin: 0;
+    min-height: 44px;
+  }
+  .mid-row :deep(.el-card__body) {
+    padding: 12px;
+  }
+  .ability-line {
+    gap: 8px;
+  }
+  .ability-name {
+    width: 5.5em; /* 五个汉字 + 余量，长维度名不换行不裁切 */
+    font-size: 12.5px;
+  }
+  .ability-line :deep(.el-progress__text) {
+    font-size: 12px !important;
+  }
+  .stat-inner {
+    gap: 10px;
+  }
+  .stat-num {
+    font-size: 20px;
+  }
 }
 </style>

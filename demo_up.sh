@@ -85,11 +85,11 @@ if [ ! -d node_modules ]; then
 fi
 ( VITE_API_TARGET="http://127.0.0.1:$API_PORT" npm run dev -- --port 5199 --strictPort > "$DEMO_DIR/vite.log" 2>&1 & echo $! > "$DEMO_DIR/vite.pid" )
 
-# ---------- 健康检查 ----------
+# ---------- 健康检查（P0-01 口径：readyz 为准，health 看全量） ----------
 echo "→ 健康检查…"
 API_OK=0
 for _ in $(seq 1 40); do
-  if curl -s -m 2 "http://127.0.0.1:$API_PORT/health" 2>/dev/null | grep -q '"status"'; then
+  if curl -s -m 2 "http://127.0.0.1:$API_PORT/readyz" 2>/dev/null | grep -q '"ready"'; then
     API_OK=1
     break
   fi
@@ -103,13 +103,19 @@ for _ in $(seq 1 40); do
   fi
   sleep 1
 done
+WORKER_OK=0
+if [ "$API_OK" = "1" ]; then
+  curl -s -m 3 "http://127.0.0.1:$API_PORT/health" 2>/dev/null | grep -q '"worker": *"up"' && WORKER_OK=1
+fi
 
 echo ""
 echo "==================== OPC 演示环境 ===================="
-[ "$API_OK" = "1" ] && echo "✓ 后端 API      http://127.0.0.1:$API_PORT/docs" || echo "✗ 后端 API 未就绪（看 .demo/api.log）"
+[ "$API_OK" = "1" ] && echo "✓ 后端 API      http://127.0.0.1:$API_PORT/docs（readyz 通过）" || echo "✗ 后端 API 未就绪（看 .demo/api.log）"
 [ "$WEB_OK" = "1" ] && echo "✓ 前端工坊      http://127.0.0.1:5199  ← 浏览器打开" || echo "✗ 前端未就绪（看 .demo/vite.log）"
+[ "$WORKER_OK" = "1" ] && echo "✓ worker 心跳   异步任务可用" || echo "! worker 心跳缺失（配音/成片将失败，看 .demo/worker.log）"
 echo "  运行模式      $([ "$MOCK_MODE" = "1" ] && echo 'mock 桩' || echo "真实 AI（${LLM_MODEL_DEFAULT:-deepseek-v4-flash}）")"
 echo "  演示账号      student01/student123 · teacher01/teacher123 · enterprise01/ent123456"
 echo "  日志目录      .demo/{api,worker,vite}.log"
+echo "  Windows 优先  powershell -File scripts\\demo.ps1 start（四道闸门）"
 echo "  停止服务      bash demo_down.sh"
 echo "======================================================"

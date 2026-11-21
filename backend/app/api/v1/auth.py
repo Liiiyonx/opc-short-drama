@@ -1,7 +1,7 @@
 """认证：注册 / 登录 / 刷新（W1）。
 
-P0 开放注册（无邀请码），P1 再加审核流。
-登录失败防爆破：内存滑窗限流（只计失败尝试，成功清零）。
+P0-02 权限收紧：仅学生可自助注册；教师/企业账号由管理员创建
+（管理员创建的企业默认视为已认证）。登录失败防爆破：内存滑窗限流。
 """
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -61,8 +61,17 @@ async def _create_profile(db: AsyncSession, user: User, body: RegisterIn) -> Non
         )
 
 
-@router.post("/register", summary="注册（P0 开放）")
+@router.post("/register", summary="注册（仅学生自助；教师/企业联系管理员开通）")
 async def register(body: RegisterIn, db: DbSession):
+    # P0-02 红线：任何人都不能通过公开注册直接获得教师/企业等高权限身份
+    if body.role != "student":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": 40301,
+                "message": "仅支持学生自助注册；教师/企业账号请联系平台管理员开通",
+            },
+        )
     exists = (
         await db.execute(select(User).where(User.username == body.username))
     ).scalar_one_or_none()

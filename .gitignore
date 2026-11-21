@@ -7,10 +7,13 @@ venv/
 .pytest_cache/
 .ruff_cache/
 
-# 环境与密钥（严禁提交）
+# 环境与密钥（严禁提交）；前端构建模式文件例外（P0-04：演示凭据只进 dev/demo 构建）
 .env
 *.env
 !.env.example
+!frontend/.env.development
+!frontend/.env.demo
+!frontend/.env.production
 
 # 数据库与本地存储（锚定路径，勿用裸名——否则误杀 app/services/storage 源码包）
 *.db

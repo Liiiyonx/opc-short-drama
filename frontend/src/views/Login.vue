@@ -38,24 +38,26 @@
         </el-button>
       </el-form>
 
-      <!-- 演示账号：点击快速填充 -->
-      <div class="demo-divider"><span>演示账号 · 点击快速填充</span></div>
-      <div class="demo-grid">
-        <button
-          v-for="acc in DEMO_ACCOUNTS"
-          :key="acc.username"
-          type="button"
-          class="demo-chip"
-          :style="{ '--chip-color': acc.color }"
-          @click="fillDemo(acc)"
-        >
-          <span class="chip-icon" v-html="acc.icon"></span>
-          <span class="chip-text">
-            <b>{{ acc.role }}</b>
-            <small>{{ acc.username }}</small>
-          </span>
-        </button>
-      </div>
+      <!-- 演示账号：由构建期 VITE_DEMO_ACCOUNTS 注入；生产构建无此变量 → 无凭据 -->
+      <template v-if="DEMO_ACCOUNTS.length">
+        <div class="demo-divider"><span>演示账号 · 点击快速填充</span></div>
+        <div class="demo-grid">
+          <button
+            v-for="acc in DEMO_ACCOUNTS"
+            :key="acc.username"
+            type="button"
+            class="demo-chip"
+            :style="{ '--chip-color': acc.color }"
+            @click="fillDemo(acc)"
+          >
+            <span class="chip-icon" v-html="acc.icon"></span>
+            <span class="chip-text">
+              <b>{{ acc.role }}</b>
+              <small>{{ acc.username }}</small>
+            </span>
+          </button>
+        </div>
+      </template>
     </main>
 
     <footer class="page-footer">福州理工学院 · 产教融合创新实践</footer>
@@ -73,37 +75,34 @@ const userStore = useUserStore()
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 
-// 演示账号（与 scripts.seed 一致）；点击填充，登录仍需手动确认
-const DEMO_ACCOUNTS = [
-  {
-    role: '学生',
-    username: 'student01',
-    password: 'student123',
-    color: '#409eff',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>'
-  },
-  {
-    role: '教师',
-    username: 'teacher01',
-    password: 'teacher123',
-    color: '#67c23a',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>'
-  },
-  {
-    role: '企业',
-    username: 'enterprise01',
-    password: 'ent123456',
-    color: '#e6a23c',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>'
-  },
-  {
-    role: '管理员',
-    username: 'admin',
-    password: 'admin123',
-    color: '#f56c6c',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
+// P0-04 Demo 模式隔离：演示账号由构建期环境变量注入（VITE_DEMO_ACCOUNTS），
+// 生产构建不携带该变量 → 产物中不含任何演示密码（可在 dist 里 grep 验证）。
+const CHIP_ICONS = {
+  student: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>',
+  teacher: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+  enterprise: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+  admin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>'
+}
+const CHIP_COLORS = {
+  student: '#409eff',
+  teacher: '#67c23a',
+  enterprise: '#e6a23c',
+  admin: '#f56c6c'
+}
+
+function parseDemoAccounts(raw) {
+  try {
+    const list = JSON.parse(raw || '[]')
+    if (!Array.isArray(list)) return []
+    return list
+      .filter((acc) => acc && acc.username && acc.password)
+      .map((acc) => ({ ...acc, icon: CHIP_ICONS[acc.key] || '', color: CHIP_COLORS[acc.key] || '#909399' }))
+  } catch {
+    return []
   }
-]
+}
+
+const DEMO_ACCOUNTS = parseDemoAccounts(import.meta.env.VITE_DEMO_ACCOUNTS)
 
 function fillDemo(acc) {
   form.username = acc.username

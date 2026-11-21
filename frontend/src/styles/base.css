@@ -133,3 +133,30 @@ body .el-dialog,
 body .el-drawer {
   border-radius: 12px;
 }
+
+/* ---------- P0-07 移动端全局基线（≤640px） ---------- */
+/* 页面容器收边距 + 页头纵向堆叠 + 弹窗不超屏；各端页面共用 */
+
+@media (max-width: 640px) {
+  .page,
+  .workshop {
+    padding: 16px 14px 40px;
+  }
+
+  .page .head,
+  .workshop-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .page .title,
+  .workshop-head .title {
+    font-size: 18px;
+  }
+}
+
+body .el-dialog {
+  max-width: 94vw;
+}

@@ -5,10 +5,20 @@
 
 入队由 API 侧 enqueue_agent_job 完成；任务执行后推进关联作品状态。
 启动时清扫遗留 running 会话（上次 worker 崩溃/中断的兜底）。
+
+P0-01 worker 心跳：每 15s 续期 Redis 键 worker:heartbeat（TTL 40s）；
+API 侧 /health 与 Compose worker healthcheck 据此判定 worker 存活。
 """
+import asyncio
+
 from urllib.parse import urlparse
 
 from app.core.config import get_settings
+from app.core.health import WORKER_HEARTBEAT_KEY, WORKER_HEARTBEAT_TTL
+
+_HEARTBEAT_INTERVAL = 15  # 秒；TTL 40s = 2 次漏跳即判失联
+
+_heartbeat_task: asyncio.Task | None = None
 
 
 def _redis_settings():
@@ -66,8 +76,20 @@ async def run_agent_job(ctx: dict, session_id: int) -> None:
             await finalize_work_from_session(db, session)
 
 
+async def _heartbeat_loop(ctx: dict) -> None:
+    """周期续期心跳键；Redis 抖动时静默重试，进程被杀则 TTL 自然过期。"""
+    redis = ctx["redis"]
+    while True:
+        try:
+            await redis.set(WORKER_HEARTBEAT_KEY, str(int(asyncio.get_event_loop().time())), ex=WORKER_HEARTBEAT_TTL)
+        except Exception:  # noqa: BLE001  # 心跳失败不拖垮 worker
+            pass
+        await asyncio.sleep(_HEARTBEAT_INTERVAL)
+
+
 async def _sweep_on_startup(ctx: dict) -> None:
-    """worker 启动清扫：把上次中断遗留的 running 会话判失败。"""
+    """worker 启动清扫：把上次中断遗留的 running 会话判失败，并启动心跳循环。"""
+    global _heartbeat_task
     from app.agents.orchestrator import sweep_stale_sessions
     from app.db.session import AsyncSessionLocal
 
@@ -75,6 +97,9 @@ async def _sweep_on_startup(ctx: dict) -> None:
         cleaned = await sweep_stale_sessions(db)
     if cleaned:
         print(f"[worker] 启动清扫：{cleaned} 个超时会话已判失败")
+
+    _heartbeat_task = asyncio.create_task(_heartbeat_loop(ctx))
+    print(f"[worker] 心跳已启动（{_HEARTBEAT_INTERVAL}s/次，TTL {WORKER_HEARTBEAT_TTL}s）")
 
 
 class WorkerSettings:

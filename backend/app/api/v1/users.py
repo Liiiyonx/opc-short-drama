@@ -97,7 +97,7 @@ async def list_users(
 
 @router.post(
     "",
-    summary="创建用户（管理员）",
+    summary="创建用户（管理员，含角色档案；企业视为已认证）",
     dependencies=[Depends(require_role("admin"))],
 )
 async def create_user(body: UserCreate, db: DbSession):
@@ -116,6 +116,21 @@ async def create_user(body: UserCreate, db: DbSession):
         status=1,
     )
     db.add(user)
+    await db.flush()
+    # P0-02 配套：教师/企业不再开放自助注册，管理员建号时同步补全档案；
+    # 企业账号由管理员创建即视为完成资质审核（可发布工单）
+    if body.role == "student":
+        db.add(StudentProfile(user_id=user.id, major=body.major, grade=body.grade))
+    elif body.role == "teacher":
+        db.add(TeacherProfile(user_id=user.id, college=body.college, title=body.title))
+    elif body.role == "enterprise":
+        db.add(
+            EnterpriseProfile(
+                user_id=user.id,
+                company_name=body.company_name or body.username,
+                verify_status="approved",
+            )
+        )
     await db.commit()
     await db.refresh(user)
     return ok(UserOut.model_validate(user).model_dump(), "创建成功")

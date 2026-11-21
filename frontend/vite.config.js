@@ -21,6 +21,19 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8000',
         changeOrigin: true
+      },
+      // 三档健康探针（管理员系统健康页直读 /health）
+      '/livez': {
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '/readyz': {
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '/health': {
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true
       }
     }
   }

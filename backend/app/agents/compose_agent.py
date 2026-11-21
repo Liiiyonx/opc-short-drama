@@ -1,8 +1,11 @@
 """成片合成 Agent（compose）：分镜图 + 配音 + SRT → 烧字幕 MP4（异步）。
 
 图片来源：分镜作品的 image 资产（用户在 W3 上传接口上传）；
-无上传时按镜头数生成占位图（纯色 lavfi），保证链路可演示。
+无上传时按镜头数生成确定性演示帧（渐变构图 + 镜头信息，非纯色）。
 is_async=True，由 arq worker 执行（ffmpeg CPU 密集）。
+
+P0-08 成片质检：合成后自动过 video_qc_report（黑帧/纯色帧/削波/音轨），
+结果写入 output.qc；不通过时产物仍落库但会话日志明确标记，演示前可追溯。
 
 阻塞调用（ffmpeg/ffprobe 子进程）统一走 asyncio.to_thread，
 避免卡住 worker 事件循环影响其他并发任务。
@@ -13,7 +16,13 @@ from pydantic import BaseModel, Field
 
 from app.agents.base import Agent, AgentContext
 from app.core.config import get_settings
-from app.services.media import MediaError, burn_video, placeholder_png, probe_duration_ms
+from app.services.media import (
+    MediaError,
+    burn_video,
+    probe_duration_ms,
+    scene_frame_png,
+    video_qc_report,
+)
 from app.services.work_store import (
     latest_asset,
     latest_json_asset,
@@ -36,6 +45,7 @@ class ComposeOutput(BaseModel):
     duration_ms: int = 0
     images_used: int = 0
     placeholder: bool = False
+    qc: dict = Field(default_factory=dict, description="成片质检报告（pass/issues/stats）")
 
 
 class ComposeAgent(Agent):
@@ -67,11 +77,19 @@ class ComposeAgent(Agent):
         image_assets = await list_assets(ctx.db, storyboard.id, "image")
         placeholder = not image_assets
         if placeholder:
+            shots_list = shots["shots"]
             images = list(
                 await asyncio.gather(
                     *(
-                        asyncio.to_thread(placeholder_png, index)
-                        for index in range(len(shots["shots"]))
+                        asyncio.to_thread(
+                            scene_frame_png,
+                            index,
+                            payload.width,
+                            payload.height,
+                            f"Scene {shot.get('scene', index + 1)} · {shot.get('shot_size', '')}",
+                            shot.get("dialogue", "") or shot.get("visual_prompt", ""),
+                        )
+                        for index, shot in enumerate(shots_list)
                     )
                 )
             )
@@ -82,6 +100,10 @@ class ComposeAgent(Agent):
             burn_video, images, audio_bytes, srt_text, payload.width, payload.height
         )
         duration_ms = await asyncio.to_thread(probe_duration_ms, video_bytes, ".mp4")
+        qc = await asyncio.to_thread(video_qc_report, video_bytes)
+        if not qc.get("pass"):
+            # 质检不过不阻断落库（保持链路可演示），但显式暴露问题供人工修复
+            ctx.usage["qc_issues"] = "; ".join(qc.get("issues", []))
         _, video_key = await save_asset(
             ctx.db,
             ctx.work_id,
@@ -95,4 +117,5 @@ class ComposeAgent(Agent):
             duration_ms=duration_ms,
             images_used=len(images),
             placeholder=placeholder,
+            qc=qc,
         )

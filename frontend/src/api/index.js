@@ -15,6 +15,38 @@ http.interceptors.request.use((config) => {
   return config
 })
 
+// ---------- P0-03：401 自动刷新（单飞）+ 原请求重放 ----------
+// 并发 401 共享同一个刷新 Promise，只发一次 /auth/refresh；
+// 刷新成功重放原请求，失败才清登录态跳登录页。
+let refreshing = null
+
+function getRefreshToken() {
+  return localStorage.getItem('opc_refresh_token') || ''
+}
+
+function clearAuthAndRedirect() {
+  localStorage.removeItem('opc_token')
+  localStorage.removeItem('opc_refresh_token')
+  if (!window.location.pathname.startsWith('/login')) {
+    window.location.assign('/login')
+  }
+}
+
+async function refreshAccessToken() {
+  const refresh_token = getRefreshToken()
+  if (!refresh_token) {
+    throw new Error('no refresh token')
+  }
+  // POST /auth/refresh 走原生 axios，避免被本文件的 401 拦截器递归捕获
+  const response = await axios.post('/api/v1/auth/refresh', { refresh_token })
+  const body = response.data
+  if (body && body.code === 0 && body.data && body.data.access_token) {
+    localStorage.setItem('opc_token', body.data.access_token)
+    return body.data.access_token
+  }
+  throw new Error('refresh rejected')
+}
+
 // 统一解包 {code, message, data}
 http.interceptors.response.use(
   (response) => {
@@ -27,17 +59,43 @@ http.interceptors.response.use(
     }
     return body
   },
-  (error) => {
+  async (error) => {
+    const config = error.config || {}
     const body = error.response && error.response.data
     if (body && body.message) {
       error.message = body.message
     }
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('opc_token')
-      // 过期/失效即刻回登录页，而不是停在原页等下一次操作才报错
-      if (!window.location.pathname.startsWith('/login')) {
-        window.location.assign('/login')
+    // P0-10：后端响应自带 X-Request-ID，透出到提示里便于报障定位
+    const requestId = error.response && error.response.headers && error.response.headers['x-request-id']
+    if (requestId) {
+      error.requestId = requestId
+      error.message = `${error.message}（追踪码 ${requestId}）`
+    }
+
+    const isAuthRequest =
+      typeof config.url === 'string' &&
+      (config.url.includes('/auth/login') || config.url.includes('/auth/refresh'))
+
+    if (error.response && error.response.status === 401 && !config._retried && !isAuthRequest) {
+      if (!refreshing) {
+        refreshing = refreshAccessToken().finally(() => {
+          refreshing = null
+        })
       }
+      try {
+        const newToken = await refreshing
+        config._retried = true
+        config.headers = { ...(config.headers || {}), Authorization: `Bearer ${newToken}` }
+        return http.request(config)
+      } catch {
+        // 刷新失败（token 过期/账号被禁）→ 清登录态回登录页
+        clearAuthAndRedirect()
+        return Promise.reject(error)
+      }
+    }
+
+    if (error.response && error.response.status === 401) {
+      clearAuthAndRedirect()
     }
     return Promise.reject(error)
   }
@@ -70,6 +128,12 @@ export async function downloadFile(path, filename) {
 // ---------- 认证 ----------
 export async function login(payload) {
   const response = await axios.post('/api/v1/auth/login', payload)
+  return response.data.data
+}
+
+// ---------- 系统健康（管理员，P0-10；/health 不在 /api/v1 下，走原生 axios 不解包） ----------
+export async function getSystemHealth() {
+  const response = await axios.get('/health')
   return response.data.data
 }
 

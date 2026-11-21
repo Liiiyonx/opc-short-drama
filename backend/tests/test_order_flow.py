@@ -47,7 +47,8 @@ def client(tmp_path, monkeypatch):
             enterprise = User(username="w7ent", password_hash=hash_password("ent123456"), role="enterprise", status=1)
             student = User(username="w7student", password_hash=hash_password("student123"), role="student", status=1)
             weak = User(username="w7weak", password_hash=hash_password("student123"), role="student", status=1)
-            session.add_all([teacher, enterprise, student, weak])
+            admin = User(username="w7admin", password_hash=hash_password("admin123"), role="admin", status=1)
+            session.add_all([teacher, enterprise, student, weak, admin])
             await session.commit()
             session.add(
                 EnterpriseProfile(
@@ -207,14 +208,43 @@ def test_order_permissions_and_threshold(client):
     assert teacher_view.status_code == 200  # 教师可见
 
 
-def test_enterprise_requires_approval(client):
-    """未认证企业不能发布工单（合规约束）。"""
+def test_register_enterprise_rejected(client):
+    """P0-02 红线：公开注册不得自助获得企业（或教师）身份。"""
     resp = client.post(
         "/api/v1/auth/register",
         json={"username": "w7ent2", "password": "ent123456", "role": "enterprise", "company_name": "未认证公司"},
     )
-    assert resp.status_code == 200
-    token = resp.json()["data"]["access_token"]
-    resp = client.post("/api/v1/orders", json=ORDER_PAYLOAD, headers=_h(token))
     assert resp.status_code == 403
-    assert "资质" in resp.json()["message"]
+    assert "管理员" in resp.json()["message"]
+    resp = client.post(
+        "/api/v1/auth/register",
+        json={"username": "w7tea2", "password": "teacher123", "role": "teacher"},
+    )
+    assert resp.status_code == 403
+
+
+def test_admin_created_enterprise_is_approved(client):
+    """管理员创建的企业账号自带已认证档案（自助注册通道已关闭的配套路径）。"""
+    # 教师无权建号
+    teacher = _h(_token(client, "w7teacher", "teacher123"))
+    resp = client.post(
+        "/api/v1/users",
+        json={"username": "w7ent3", "password": "ent123456", "role": "enterprise", "company_name": "正规公司"},
+        headers=teacher,
+    )
+    assert resp.status_code == 403
+
+    # 管理员建号成功
+    admin = _h(_token(client, "w7admin", "admin123"))
+    resp = client.post(
+        "/api/v1/users",
+        json={"username": "w7ent3", "password": "ent123456", "role": "enterprise", "company_name": "正规公司"},
+        headers=admin,
+    )
+    assert resp.status_code == 200, resp.text
+
+    # 新企业登录即可发布工单（送审）
+    ent = _h(_token(client, "w7ent3", "ent123456"))
+    resp = client.post("/api/v1/orders", json=ORDER_PAYLOAD, headers=ent)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "pending_review"

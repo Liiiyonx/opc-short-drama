@@ -12,6 +12,12 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=6, max_length=64)
     role: Role = "student"
     phone: str | None = Field(default=None, max_length=20)
+    # 档案字段（管理员建号时一并补全，按角色选用）
+    major: str | None = None
+    grade: str | None = None
+    college: str | None = None
+    title: str | None = None
+    company_name: str | None = None
 
 
 class UserStatusIn(BaseModel):

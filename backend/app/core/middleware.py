@@ -1,7 +1,7 @@
 """纯 ASGI 访问日志中间件（不走 BaseHTTPMiddleware，零包装开销）。
 
 - 每个请求生成/透传 X-Request-ID，响应头回写，日志可串联前端报障；
-- 记录 method/path/status/耗时（ms），跳过 /health 噪声；
+- 记录 method/path/status/耗时（ms），跳过健康探针噪声；
 - 4xx/5slow 标 warn，便于 grep 定位。
 """
 import logging
@@ -11,6 +11,9 @@ import uuid
 logger = logging.getLogger("opc.access")
 
 _SLOW_MS = 1000.0
+
+# 编排层高频轮询的探针路径，不进访问日志
+_QUIET_PATHS = {"/health", "/livez", "/readyz"}
 
 
 class AccessLogMiddleware:
@@ -42,7 +45,7 @@ class AccessLogMiddleware:
         try:
             await self.app(scope, receive, send_wrapper)
         finally:
-            if path != "/health":
+            if path not in _QUIET_PATHS:
                 duration_ms = (time.perf_counter() - started) * 1000
                 status = status_holder["status"]
                 level = (
