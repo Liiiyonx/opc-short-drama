@@ -39,7 +39,7 @@
 - **教师端**：任务发布（Rubric 编辑器）、批改 → 五维能力快照、能力预警、AI 备课、工单合规审核、AI 用量看板（成本/tokens/趋势）
 - **企业端**：工单发布（资质审核）、投标定标状态机、AI 人才匹配
 - **管理后台**：用户/课程管理
-- **平台底座**：JWT 双 token、登录防爆破限流、每用户配额、成本全记账、arq 异步队列 + 超时清扫、流式文件 + Range、暗色模式、深度健康检查
+- **平台底座**：JWT 双 token（401 自动刷新重放）、登录防爆破限流、每用户配额、成本全记账、arq 异步队列 + worker 心跳 + 超时清扫、流式文件 + Range、暗色模式、三档健康检查（/livez /readyz /health）、成片质检闸门（黑帧/纯色帧/削波）
 
 ## 🏗️ 架构
 
@@ -85,14 +85,29 @@ npm install
 npm run dev            # http://localhost:5173，/api 代理到 8000
 ```
 
-**一键演示**（自动找解释器 / 加载密钥 / 迁移 / 健康检查）：
+**一键演示**（Windows 优先 PowerShell：依赖闸门 + 四道健康闸门，任一失败不进入演示）：
 
-```bash
-bash demo_up.sh           # 真实 AI 模式
-bash demo_up.sh --mock    # 无密钥演示（全程离线，显式测试桩）
-bash demo_down.sh         # 停止
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\demo.ps1 start     # 启动 + 闸门
+powershell -ExecutionPolicy Bypass -File scripts\demo.ps1 status    # 只跑闸门
+powershell -ExecutionPolicy Bypass -File scripts\demo.ps1 down      # 停止
+powershell -ExecutionPolicy Bypass -File scripts\demo.ps1 snapshot  # 数据快照（含 SHA256）
+powershell -ExecutionPolicy Bypass -File scripts\demo.ps1 reset     # 60 秒回滚最近快照
 # → http://127.0.0.1:5199
 ```
+
+Bash 等效：`bash demo_up.sh --mock` / `bash demo_down.sh`（次选，Windows 现场建议上面这套）。
+
+**前端构建模式**：`npm run build` 生产构建不携带任何演示密码（构建期变量 `VITE_DEMO_ACCOUNTS` 仅存在于 `.env.development` / `.env.demo`）；答辩演示构建用 `npm run build -- --mode demo`。
+
+### 🎬 答辩样片流水线（确定性可复现）
+
+```bash
+cd backend
+python -m scripts.generate_scenario --all   # 或指定场景目录
+```
+
+`scenarios/` 下每组场景包含 `input.json`（剧本/角色卡/镜头表/配音配置，可审计）→ 程序化场景图（ffmpeg 构图模板，非纯色、无第三方素材）→ edge-tts 真实配音 → 烧字幕（安全区内）→ Ken Burns 运镜 + 交叉溶解 + 氛围垫乐的 `final.mp4`（1080×1920）+ `qc-report.json`（自动质检）+ `license-manifest.json`（全素材来源与许可）。当前样片：北美逆袭 / 东南亚电商 / 文化出海。
 
 | 角色 | 账号 | 密码 |
 |---|---|---|
@@ -101,14 +116,14 @@ bash demo_down.sh         # 停止
 | 企业 | enterprise01 | ent123456 |
 | 管理员 | admin | admin123 |
 
-> 登录页支持**演示账号一键填充**；15 分钟全流程演示脚本见 `docs/演示脚本.md`。
+> 登录页**演示账号一键填充**仅出现在 dev/demo 构建中（生产构建无凭据）；公开注册仅限学生自助，教师/企业账号由管理员开通。15 分钟全流程演示脚本见 `docs/演示脚本.md`。
 
 ## 🧪 测试
 
 ```bash
 cd backend
-python -m pytest tests/ -q          # 55+ 用例：API 全流程 / 权限矩阵 / 配额 / 限流 / 分析
-python -m scripts.e2e_api_test      # API 级端到端冒烟（35 断言，真实模式约 0.05 元）
+python -m pytest tests/ -q          # 63 用例：API 全流程 / 权限矩阵 / 配额 / 限流 / P0 加固回归
+python -m scripts.e2e_api_test      # API 级端到端（自建夹具数据，可连续重复执行；真实模式约 0.05 元）
 python -m scripts.selfcheck         # 环境体检（含真实 LLM / Edge-TTS 调用）
 python -m scripts.bench_api         # 非 AI 接口 P95 < 500ms 基准
 ```
@@ -163,6 +178,7 @@ bash deploy/backup.sh   # 数据备份（MySQL + MinIO，滚动保留 7 份，�
 | docs/05 智能体设计 | 智能体契约、System Prompt、编排状态机 |
 | docs/06 开发计划 | 排期、分工、里程碑 |
 | docs/07 风险与合规 | 风险登记册、五条合规红线 |
+| docs/08 三创赛优化计划书 | 竞赛叙事、零故障演示、P0/P1/P2 路线、GitHub 对标与 8 周执行计划 |
 | docs/演示脚本.md | 15 分钟全流程演示（含新功能） |
 | docs/开发进度存档.md | 每步实质工作的开发日志 |
 
