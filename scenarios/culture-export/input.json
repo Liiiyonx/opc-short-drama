@@ -1,0 +1,52 @@
+{
+  "id": "culture-export",
+  "title": "The Porcelain Road（文化出海 · 瓷路）",
+  "market": "北美 / 全球",
+  "genre": "非遗文创",
+  "mood": "serene",
+  "aspect": [1080, 1920],
+  "voice": { "provider": "edge-tts", "voice_id": "zh-CN-XiaoxiaoNeural", "rate": "+4%" },
+  "character_bible": [
+    {
+      "id": "su_01",
+      "name": "苏晚",
+      "age": 26,
+      "role": "主角：非遗传承人 → 跨境主播",
+      "look": "素色棉麻长衫；腕间旧镯；袖口沾釉粉",
+      "anchor_prompt": "young chinese female artisan, plain linen robe, jade bracelet, calm",
+      "forbidden_drift": ["现代时装化", "浓妆"]
+    }
+  ],
+  "scenes": [
+    { "id": "port", "template": "containers", "palette": ["#12222C", "#3E6E7E", "#C9E4E8"] },
+    { "id": "office", "template": "office", "palette": ["#1A1E2C", "#5A6B8C", "#E8D5B0"] },
+    { "id": "market", "template": "market", "palette": ["#231A10", "#8A6E3E", "#F2E2C4"] },
+    { "id": "rooftop", "template": "rooftop", "palette": ["#1C2438", "#7A8CA6", "#F2D8A8"] }
+  ],
+  "shots": [
+    { "no": 1, "scene_id": "port", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "景德镇的最后一批窑火，差点熄灭。",
+      "visual_note": "钩子：危机开场" },
+    { "no": 2, "scene_id": "office", "camera_move": "pan_right", "transition": "smoothleft",
+      "dialogue": "我把祖传手艺，搬进了跨境直播间。",
+      "visual_note": "传统 × 直播的碰撞" },
+    { "no": 3, "scene_id": "market", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "第一场直播，只有七个人看。",
+      "visual_note": "低谷真实感" },
+    { "no": 4, "scene_id": "port", "camera_move": "pull_out", "transition": "smoothright",
+      "dialogue": "现在，每天四百件瓷器发往海外。",
+      "visual_note": "规模转折" },
+    { "no": 5, "scene_id": "rooftop", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "纽约客户说，这是会讲故事的中国礼物。",
+      "visual_note": "外部认可" },
+    { "no": 6, "scene_id": "office", "camera_move": "pull_out", "transition": "fade",
+      "dialogue": "老手艺不是过去，是下一个风口。",
+      "visual_note": "金句" },
+    { "no": 7, "scene_id": "port", "camera_move": "pan_left", "transition": "smoothleft",
+      "dialogue": "我的工牌上写着：非遗传承人，也是主播。",
+      "visual_note": "身份合一" },
+    { "no": 8, "scene_id": "rooftop", "camera_move": "push_in", "transition": "fadeblack",
+      "dialogue": "关注我，看下一集：定价的艺术。",
+      "visual_note": "CTA" }
+  ]
+}

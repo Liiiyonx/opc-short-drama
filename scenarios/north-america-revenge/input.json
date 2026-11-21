@@ -1,0 +1,53 @@
+{
+  "id": "north-america-revenge",
+  "title": "City of Second Chances（都市逆袭 · 北美）",
+  "market": "北美",
+  "genre": "逆袭",
+  "mood": "tense",
+  "aspect": [1080, 1920],
+  "voice": { "provider": "edge-tts", "voice_id": "en-US-ChristopherNeural", "rate": "+6%" },
+  "character_bible": [
+    {
+      "id": "lin_01",
+      "name": "Lin Hai",
+      "age": 24,
+      "role": "主角：外卖员 → 出海品牌创始人",
+      "look": "工装外套 → 创业者衬衫；短发；黑色双肩包",
+      "anchor_prompt": "young asian male founder, short black hair, confident, minimal wardrobe",
+      "forbidden_drift": ["发色漂染", "眼镜", "胡型突变"]
+    }
+  ],
+  "scenes": [
+    { "id": "night_city", "template": "skyline", "palette": ["#0B1D3A", "#2B5FA8", "#FFC857"] },
+    { "id": "office", "template": "office", "palette": ["#131C33", "#3D5A8C", "#FFC857"] },
+    { "id": "rooftop", "template": "rooftop", "palette": ["#1A1030", "#8A4E7E", "#FFB36B"] },
+    { "id": "market", "template": "market", "palette": ["#2A1A0E", "#7A4A2E", "#FFD98A"] },
+    { "id": "port", "template": "containers", "palette": ["#0E2233", "#2F6F8F", "#7FD4E8"] }
+  ],
+  "shots": [
+    { "no": 1, "scene_id": "night_city", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "They said a delivery boy can't build an empire.",
+      "visual_note": "钩子：夜景都市俯瞰，人物未现身先给世界观" },
+    { "no": 2, "scene_id": "office", "camera_move": "pan_right", "transition": "smoothleft",
+      "dialogue": "Six months later — forty-seven stores, three cities.",
+      "visual_note": "时间跳切：窗框内的城市天际线" },
+    { "no": 3, "scene_id": "rooftop", "camera_move": "pull_out", "transition": "fade",
+      "dialogue": "My first warehouse was a bicycle basket.",
+      "visual_note": "天台黄昏，回顾线" },
+    { "no": 4, "scene_id": "market", "camera_move": "push_in", "transition": "circleopen",
+      "dialogue": "Every rejection letter became my business plan.",
+      "visual_note": "市井起点，暖色" },
+    { "no": 5, "scene_id": "port", "camera_move": "pan_left", "transition": "smoothright",
+      "dialogue": "Now my brand ships to every port in America.",
+      "visual_note": "港口集装箱 = 出海意象" },
+    { "no": 6, "scene_id": "night_city", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "The city that ignored me now wears my name.",
+      "visual_note": "回到开篇场景形成呼应" },
+    { "no": 7, "scene_id": "office", "camera_move": "pull_out", "transition": "fade",
+      "dialogue": "New York didn't change. I did.",
+      "visual_note": "金句镜头" },
+    { "no": 8, "scene_id": "rooftop", "camera_move": "push_in", "transition": "fadeblack",
+      "dialogue": "If I made it — so can you. Follow for Episode 2.",
+      "visual_note": "CTA 收尾" }
+  ]
+}

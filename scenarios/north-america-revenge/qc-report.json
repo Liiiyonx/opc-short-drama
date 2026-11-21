@@ -1,0 +1,12 @@
+{
+  "pass": true,
+  "issues": [],
+  "stats": {
+    "duration_ms": 30200,
+    "width": 1080,
+    "height": 1920,
+    "video_codec": "h264",
+    "has_audio": true,
+    "qc_pass": true
+  }
+}

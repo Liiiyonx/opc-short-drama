@@ -1,0 +1,197 @@
+{
+  "scenario": "north-america-revenge",
+  "title": "City of Second Chances（都市逆袭 · 北美）",
+  "generated_at": "2026-11-21 07:50:56",
+  "assets": [
+    {
+      "file": "images/shot_01.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "skyline",
+      "palette": [
+        "#0B1D3A",
+        "#2B5FA8",
+        "#FFC857"
+      ],
+      "prompt": "钩子：夜景都市俯瞰，人物未现身先给世界观"
+    },
+    {
+      "file": "audio/voice_01.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "They said a delivery boy can't build an empire."
+    },
+    {
+      "file": "images/shot_02.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "office",
+      "palette": [
+        "#131C33",
+        "#3D5A8C",
+        "#FFC857"
+      ],
+      "prompt": "时间跳切：窗框内的城市天际线"
+    },
+    {
+      "file": "audio/voice_02.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "Six months later — forty-seven stores, three cities."
+    },
+    {
+      "file": "images/shot_03.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "rooftop",
+      "palette": [
+        "#1A1030",
+        "#8A4E7E",
+        "#FFB36B"
+      ],
+      "prompt": "天台黄昏，回顾线"
+    },
+    {
+      "file": "audio/voice_03.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "My first warehouse was a bicycle basket."
+    },
+    {
+      "file": "images/shot_04.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "market",
+      "palette": [
+        "#2A1A0E",
+        "#7A4A2E",
+        "#FFD98A"
+      ],
+      "prompt": "市井起点，暖色"
+    },
+    {
+      "file": "audio/voice_04.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "Every rejection letter became my business plan."
+    },
+    {
+      "file": "images/shot_05.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "containers",
+      "palette": [
+        "#0E2233",
+        "#2F6F8F",
+        "#7FD4E8"
+      ],
+      "prompt": "港口集装箱 = 出海意象"
+    },
+    {
+      "file": "audio/voice_05.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "Now my brand ships to every port in America."
+    },
+    {
+      "file": "images/shot_06.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "skyline",
+      "palette": [
+        "#0B1D3A",
+        "#2B5FA8",
+        "#FFC857"
+      ],
+      "prompt": "回到开篇场景形成呼应"
+    },
+    {
+      "file": "audio/voice_06.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "The city that ignored me now wears my name."
+    },
+    {
+      "file": "images/shot_07.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "office",
+      "palette": [
+        "#131C33",
+        "#3D5A8C",
+        "#FFC857"
+      ],
+      "prompt": "金句镜头"
+    },
+    {
+      "file": "audio/voice_07.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "New York didn't change. I did."
+    },
+    {
+      "file": "images/shot_08.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "rooftop",
+      "palette": [
+        "#1A1030",
+        "#8A4E7E",
+        "#FFB36B"
+      ],
+      "prompt": "CTA 收尾"
+    },
+    {
+      "file": "audio/voice_08.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-ChristopherNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "If I made it — so can you. Follow for Episode 2."
+    },
+    {
+      "file": "subtitles.srt",
+      "type": "subtitle",
+      "source": "generated",
+      "license": "generated"
+    },
+    {
+      "file": "audio/bgm.wav",
+      "type": "audio",
+      "source": "procedural-ffmpeg (aevalsrc chord pad)",
+      "license": "generated"
+    },
+    {
+      "file": "final.mp4",
+      "type": "video",
+      "source": "procedural (ffmpeg xfade + burn-in)",
+      "license": "generated"
+    }
+  ],
+  "qc": {
+    "pass": true,
+    "issues": [],
+    "stats": {
+      "duration_ms": 30200,
+      "width": 1080,
+      "height": 1920,
+      "video_codec": "h264",
+      "has_audio": true,
+      "qc_pass": true
+    }
+  }
+}

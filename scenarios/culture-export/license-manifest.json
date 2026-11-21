@@ -1,0 +1,197 @@
+{
+  "scenario": "culture-export",
+  "title": "The Porcelain Road（文化出海 · 瓷路）",
+  "generated_at": "2026-11-21 07:49:54",
+  "assets": [
+    {
+      "file": "images/shot_01.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "containers",
+      "palette": [
+        "#12222C",
+        "#3E6E7E",
+        "#C9E4E8"
+      ],
+      "prompt": "钩子：危机开场"
+    },
+    {
+      "file": "audio/voice_01.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "景德镇的最后一批窑火，差点熄灭。"
+    },
+    {
+      "file": "images/shot_02.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "office",
+      "palette": [
+        "#1A1E2C",
+        "#5A6B8C",
+        "#E8D5B0"
+      ],
+      "prompt": "传统 × 直播的碰撞"
+    },
+    {
+      "file": "audio/voice_02.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "我把祖传手艺，搬进了跨境直播间。"
+    },
+    {
+      "file": "images/shot_03.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "market",
+      "palette": [
+        "#231A10",
+        "#8A6E3E",
+        "#F2E2C4"
+      ],
+      "prompt": "低谷真实感"
+    },
+    {
+      "file": "audio/voice_03.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "第一场直播，只有七个人看。"
+    },
+    {
+      "file": "images/shot_04.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "containers",
+      "palette": [
+        "#12222C",
+        "#3E6E7E",
+        "#C9E4E8"
+      ],
+      "prompt": "规模转折"
+    },
+    {
+      "file": "audio/voice_04.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "现在，每天四百件瓷器发往海外。"
+    },
+    {
+      "file": "images/shot_05.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "rooftop",
+      "palette": [
+        "#1C2438",
+        "#7A8CA6",
+        "#F2D8A8"
+      ],
+      "prompt": "外部认可"
+    },
+    {
+      "file": "audio/voice_05.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "纽约客户说，这是会讲故事的中国礼物。"
+    },
+    {
+      "file": "images/shot_06.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "office",
+      "palette": [
+        "#1A1E2C",
+        "#5A6B8C",
+        "#E8D5B0"
+      ],
+      "prompt": "金句"
+    },
+    {
+      "file": "audio/voice_06.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "老手艺不是过去，是下一个风口。"
+    },
+    {
+      "file": "images/shot_07.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "containers",
+      "palette": [
+        "#12222C",
+        "#3E6E7E",
+        "#C9E4E8"
+      ],
+      "prompt": "身份合一"
+    },
+    {
+      "file": "audio/voice_07.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "我的工牌上写着：非遗传承人，也是主播。"
+    },
+    {
+      "file": "images/shot_08.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "rooftop",
+      "palette": [
+        "#1C2438",
+        "#7A8CA6",
+        "#F2D8A8"
+      ],
+      "prompt": "CTA"
+    },
+    {
+      "file": "audio/voice_08.mp3",
+      "type": "audio",
+      "source": "edge-tts zh-CN-XiaoxiaoNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "关注我，看下一集：定价的艺术。"
+    },
+    {
+      "file": "subtitles.srt",
+      "type": "subtitle",
+      "source": "generated",
+      "license": "generated"
+    },
+    {
+      "file": "audio/bgm.wav",
+      "type": "audio",
+      "source": "procedural-ffmpeg (aevalsrc chord pad)",
+      "license": "generated"
+    },
+    {
+      "file": "final.mp4",
+      "type": "video",
+      "source": "procedural (ffmpeg xfade + burn-in)",
+      "license": "generated"
+    }
+  ],
+  "qc": {
+    "pass": true,
+    "issues": [],
+    "stats": {
+      "duration_ms": 29166,
+      "width": 1080,
+      "height": 1920,
+      "video_codec": "h264",
+      "has_audio": true,
+      "qc_pass": true
+    }
+  }
+}

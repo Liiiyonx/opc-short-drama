@@ -1,0 +1,197 @@
+{
+  "scenario": "southeast-asia-commerce",
+  "title": "Lucky Cart（东南亚电商）",
+  "generated_at": "2026-11-21 07:57:57",
+  "assets": [
+    {
+      "file": "images/shot_01.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "market",
+      "palette": [
+        "#2A1A0E",
+        "#C96F4A",
+        "#FFD98A"
+      ],
+      "prompt": "钩子：具体数字制造反差"
+    },
+    {
+      "file": "audio/voice_01.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "My aunt's stall earned six dollars a day. Then I opened TikTok Shop."
+    },
+    {
+      "file": "images/shot_02.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "containers",
+      "palette": [
+        "#0E2233",
+        "#3E8E7E",
+        "#FFE9A8"
+      ],
+      "prompt": "爆单证据镜头"
+    },
+    {
+      "file": "audio/voice_02.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "First shipment: two hundred handmade bags. Sold out in nine minutes."
+    },
+    {
+      "file": "images/shot_03.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "office",
+      "palette": [
+        "#14202E",
+        "#4A6B8A",
+        "#FFD98A"
+      ],
+      "prompt": "金句"
+    },
+    {
+      "file": "audio/voice_03.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "The algorithm doesn't care where you were born."
+    },
+    {
+      "file": "images/shot_04.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "market",
+      "palette": [
+        "#2A1A0E",
+        "#C96F4A",
+        "#FFD98A"
+      ],
+      "prompt": "规模扩张"
+    },
+    {
+      "file": "audio/voice_04.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "We went from one stall to forty artisans."
+    },
+    {
+      "file": "images/shot_05.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "rooftop",
+      "palette": [
+        "#241432",
+        "#9E5A8A",
+        "#FFB36B"
+      ],
+      "prompt": "情绪高点"
+    },
+    {
+      "file": "audio/voice_05.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "Jakarta sunset. Three thousand orders. Zero sleep."
+    },
+    {
+      "file": "images/shot_06.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "containers",
+      "palette": [
+        "#0E2233",
+        "#3E8E7E",
+        "#FFE9A8"
+      ],
+      "prompt": "出海地图感"
+    },
+    {
+      "file": "audio/voice_06.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "Now we ship to Singapore, KL, and Manila."
+    },
+    {
+      "file": "images/shot_07.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "market",
+      "palette": [
+        "#2A1A0E",
+        "#C96F4A",
+        "#FFD98A"
+      ],
+      "prompt": "人情味回落"
+    },
+    {
+      "file": "audio/voice_07.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "My aunt still packs every order. With a smile."
+    },
+    {
+      "file": "images/shot_08.png",
+      "type": "image",
+      "source": "procedural-ffmpeg",
+      "license": "generated (no third-party assets)",
+      "template": "rooftop",
+      "palette": [
+        "#241432",
+        "#9E5A8A",
+        "#FFB36B"
+      ],
+      "prompt": "CTA"
+    },
+    {
+      "file": "audio/voice_08.mp3",
+      "type": "audio",
+      "source": "edge-tts en-US-JennyNeural",
+      "license": "Microsoft Edge TTS 语音合成（演示用途）",
+      "text": "Follow us — Episode 2 shows the factory."
+    },
+    {
+      "file": "subtitles.srt",
+      "type": "subtitle",
+      "source": "generated",
+      "license": "generated"
+    },
+    {
+      "file": "audio/bgm.wav",
+      "type": "audio",
+      "source": "procedural-ffmpeg (aevalsrc chord pad)",
+      "license": "generated"
+    },
+    {
+      "file": "final.mp4",
+      "type": "video",
+      "source": "procedural (ffmpeg xfade + burn-in)",
+      "license": "generated"
+    }
+  ],
+  "qc": {
+    "pass": true,
+    "issues": [],
+    "stats": {
+      "duration_ms": 30533,
+      "width": 1080,
+      "height": 1920,
+      "video_codec": "h264",
+      "has_audio": true,
+      "qc_pass": true
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "southeast-asia-commerce",
+  "title": "Lucky Cart（东南亚电商）",
+  "market": "东南亚",
+  "genre": "电商创业",
+  "mood": "warm",
+  "aspect": [1080, 1920],
+  "voice": { "provider": "edge-tts", "voice_id": "en-US-JennyNeural", "rate": "+20%" },
+  "character_bible": [
+    {
+      "id": "maya_01",
+      "name": "Maya",
+      "age": 21,
+      "role": "主角：大学生 → TikTok Shop 主理人",
+      "look": "印花头巾 / 亚麻衬衫；随身手机支架",
+      "anchor_prompt": "young southeast asian female entrepreneur, warm smile, batik accents",
+      "forbidden_drift": ["服装主色漂移", "发型突变"]
+    }
+  ],
+  "scenes": [
+    { "id": "market", "template": "market", "palette": ["#2A1A0E", "#C96F4A", "#FFD98A"] },
+    { "id": "port", "template": "containers", "palette": ["#0E2233", "#3E8E7E", "#FFE9A8"] },
+    { "id": "office", "template": "office", "palette": ["#14202E", "#4A6B8A", "#FFD98A"] },
+    { "id": "rooftop", "template": "rooftop", "palette": ["#241432", "#9E5A8A", "#FFB36B"] }
+  ],
+  "shots": [
+    { "no": 1, "scene_id": "market", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "My aunt's stall earned six dollars a day. Then I opened TikTok Shop.",
+      "visual_note": "钩子：具体数字制造反差" },
+    { "no": 2, "scene_id": "port", "camera_move": "pan_right", "transition": "smoothleft",
+      "dialogue": "First shipment: two hundred handmade bags. Sold out in nine minutes.",
+      "visual_note": "爆单证据镜头" },
+    { "no": 3, "scene_id": "office", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "The algorithm doesn't care where you were born.",
+      "visual_note": "金句" },
+    { "no": 4, "scene_id": "market", "camera_move": "pull_out", "transition": "fade",
+      "dialogue": "We went from one stall to forty artisans.",
+      "visual_note": "规模扩张" },
+    { "no": 5, "scene_id": "rooftop", "camera_move": "pan_left", "transition": "smoothright",
+      "dialogue": "Jakarta sunset. Three thousand orders. Zero sleep.",
+      "visual_note": "情绪高点" },
+    { "no": 6, "scene_id": "port", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "Now we ship to Singapore, KL, and Manila.",
+      "visual_note": "出海地图感" },
+    { "no": 7, "scene_id": "market", "camera_move": "push_in", "transition": "fade",
+      "dialogue": "My aunt still packs every order. With a smile.",
+      "visual_note": "人情味回落" },
+    { "no": 8, "scene_id": "rooftop", "camera_move": "pull_out", "transition": "fadeblack",
+      "dialogue": "Follow us — Episode 2 shows the factory.",
+      "visual_note": "CTA" }
+  ]
+}
