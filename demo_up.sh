@@ -61,8 +61,9 @@ else
   export TTS_PROVIDER=mock
 fi
 
-# 演示环境放宽媒体配额（避免彩排反复生成撞 10 次/天）
+# 演示环境放宽配额（彩排/连跑反复生成不撞 10 次/天的默认线）
 export QUOTA_MEDIA_CALLS_PER_USER_DAY="${QUOTA_MEDIA_CALLS_PER_USER_DAY:-100}"
+export QUOTA_TEXT_CALLS_PER_USER_DAY="${QUOTA_TEXT_CALLS_PER_USER_DAY:-500}"
 
 # ---------- 依赖快检 ----------
 command -v ffmpeg >/dev/null 2>&1 || echo "! 未找到 ffmpeg（配音/成片将失败）"

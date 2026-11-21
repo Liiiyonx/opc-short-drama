@@ -130,9 +130,14 @@ function Start-Services {
         Write-Info "真实 AI 模式（需已注入 LLM_API_KEY）"
     }
     $env:QUOTA_MEDIA_CALLS_PER_USER_DAY = "100"
+    $env:QUOTA_TEXT_CALLS_PER_USER_DAY = "500"
 
     Write-Step "启动 worker / API($ApiPort) / 前端($WebPort)"
     Push-Location $BackendDir
+    # 幂等：先清残留 worker（避免多 worker 抢任务、未带 mock env 的跑真实 provider）
+    $staleWorkers = @(Get-ProjectWorkerPids)
+    foreach ($p in $staleWorkers) { try { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue } catch {} }
+    if ($staleWorkers.Count -gt 0) { Write-Info "已清理 $($staleWorkers.Count) 个残留 worker" }
     Start-Process -FilePath $py -ArgumentList "-m", "arq", "app.workers.tasks.WorkerSettings" `
         -WindowStyle Hidden -RedirectStandardOutput (Join-Path $DemoDir "worker.log") -RedirectStandardError (Join-Path $DemoDir "worker.err.log")
     Start-Process -FilePath $py -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "$ApiPort" `
@@ -238,11 +243,21 @@ function Get-ProjectWorkerPids {
 }
 
 function Start-Worker {
+    # 残留 worker 必须先清（多 worker 抢任务时，未带 mock env 的会跑真实 provider
+    # —— 实测导致 TTS 批量失败）；重启一律显式注入确定性演示模式。
+    $stale = @(Get-ProjectWorkerPids)
+    foreach ($p in $stale) { try { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue } catch {} }
+    if ($stale.Count -gt 0) { Write-Info "已清理 $($stale.Count) 个残留 worker 进程" }
     $py = Find-Python
     if (-not $py) { Write-Bad "无可用 Python"; return }
+    $prevError = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $env:LLM_PROVIDER = "mock"
+    $env:TTS_PROVIDER = "mock"
     Start-Process -FilePath $py -ArgumentList "-m", "arq", "app.workers.tasks.WorkerSettings" `
         -WindowStyle Hidden -WorkingDirectory $BackendDir `
         -RedirectStandardOutput (Join-Path $DemoDir "worker.log") -RedirectStandardError (Join-Path $DemoDir "worker.err.log")
+    $ErrorActionPreference = $prevError
 }
 
 function Invoke-Chaos {
@@ -290,28 +305,36 @@ function Invoke-Chaos {
     else { Write-Bad "worker 60s 未恢复"; $results += @{ name = "worker 恢复"; ok = $false; detail = "timeout" } }
 
     # ---- 演练 2：停 Redis → /readyz 3s 内 503 → 重启 Redis 恢复 ----
-    # 权限自适应：管理员 → 停 Windows 服务；非管理员 → 尝试杀同用户态进程；
-    # 两者都不可行时明确跳过（诚实口径：不把跳过伪造成通过）。
-    Write-Step "演练 2/2：停止 Redis，验证 /readyz 3s 内 503"
-    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    $redisSvc = Get-CimInstance Win32_Service | Where-Object { $_.Name -match "redis" -and $_.State -eq "Running" } | Select-Object -First 1
-    $redisProc = Get-Process redis-server -ErrorAction SilentlyContinue | Select-Object -First 1
+    # 首选：redis-cli shutdown nosave（应用层关停，无需管理员，实测可行）；
+    # 服务方式作为无 redis-cli 时的回退；均不可行时诚实 SKIP。
+    # 实测教训：arq worker 在 Redis 失联期间会因连接超时整进程崩溃（compose 有
+    # restart: unless-stopped 兜底；脚本环境由本脚本在恢复后重启 worker）。
+    Write-Step "演练 2/2：停止 Redis（redis-cli shutdown），验证 /readyz 3s 内 503"
+    $redisCli = "C:\Program Files\Redis\redis-cli.exe"
+    $redisBin = "C:\Program Files\Redis\redis-server.exe"
+    if (-not (Test-Path $redisCli)) {
+        $proc = Get-Process redis-server -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($proc -and $proc.Path) { $redisCli = Join-Path (Split-Path $proc.Path) "redis-cli.exe" }
+    }
     $canDrill = $false
-    if ($redisSvc -and $isAdmin) {
-        $prevError = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
-        Stop-Service -Name $redisSvc.Name -Force -ErrorAction SilentlyContinue
-        $ErrorActionPreference = $prevError
+    $redisStoppedByUs = $false
+    if (Test-Path $redisCli) {
+        & $redisCli shutdown nosave 2>$null | Out-Null
+        $redisStoppedByUs = $true
         $canDrill = $true
-    } elseif ($redisProc) {
-        try {
-            Stop-Process -Id $redisProc.Id -Force -ErrorAction Stop
-            $canDrill = $true
-        } catch {
-            Write-Info "无权限停止 Redis 进程（SYSTEM 属主），跳过本演练"
-        }
     } else {
-        Write-Info "本机未发现运行中的 Redis，跳过本演练"
+        $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        $redisSvc = Get-CimInstance Win32_Service | Where-Object { $_.Name -match "redis" -and $_.State -eq "Running" } | Select-Object -First 1
+        if ($redisSvc -and $isAdmin) {
+            $prevError = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            Stop-Service -Name $redisSvc.Name -Force -ErrorAction SilentlyContinue
+            $ErrorActionPreference = $prevError
+            $redisSvcName = $redisSvc.Name
+            $canDrill = $true
+        } else {
+            Write-Info "未找到 redis-cli 且无管理员权限，跳过本演练"
+        }
     }
     if ($canDrill) {
         $prevError = $ErrorActionPreference
@@ -337,16 +360,16 @@ function Invoke-Chaos {
             Write-Bad "readyz 未在 3s 内摘除（${fifty3At}s）"
             $results += @{ name = "readyz 摘除"; ok = $false; detail = "${fifty3At}s" }
         }
-        # 重启 Redis（服务或用户态进程，原路恢复）
-        if ($redisSvc) {
+        # 重启 Redis（用户态优先：无配置启动即可满足开发/演示口径）
+        if ($redisStoppedByUs -and (Test-Path $redisBin)) {
+            Start-Process -FilePath $redisBin -ArgumentList "--port", "6379" -WindowStyle Hidden
+            Write-Info "Redis 已重启（用户态）：$redisBin"
+        } elseif ($redisSvcName) {
             $prevError = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
-            Start-Service -Name $redisSvc.Name -ErrorAction SilentlyContinue
+            Start-Service -Name $redisSvcName -ErrorAction SilentlyContinue
             $ErrorActionPreference = $prevError
-            Write-Info "Redis 服务已重启：$($redisSvc.Name)"
-        } elseif ($redisProc -and $redisProc.Path -and (Test-Path $redisProc.Path)) {
-            Start-Process -FilePath $redisProc.Path -WindowStyle Hidden
-            Write-Info "Redis 进程已重启：$($redisProc.Path)"
+            Write-Info "Redis 服务已重启：$redisSvcName"
         }
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
         $redisUp = $false
@@ -359,10 +382,32 @@ function Invoke-Chaos {
         }
         if ($redisUp) { Write-Good "Redis 恢复就绪"; $results += @{ name = "Redis 恢复"; ok = $true; detail = "ready" } }
         else { Write-Bad "Redis 30s 未恢复"; $results += @{ name = "Redis 恢复"; ok = $false; detail = "timeout" } }
+
+        # arq worker 会在 Redis 失联期间整进程崩溃（arq 连接池超时）——检测并恢复
+        Write-Step "检测 worker 是否在停服期间崩溃（arq 连接池弱点，compose 由 restart 兜底）"
+        Start-Sleep -Seconds 3
+        $workerAlive = @(Get-ProjectWorkerPids).Count -gt 0
+        if (-not $workerAlive) {
+            Write-Info "worker 已崩溃（预期内）——重启并等待心跳恢复"
+            Start-Worker
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            $wkUp = $false
+            while ($sw.Elapsed.TotalSeconds -lt 60) {
+                try {
+                    $h = Invoke-RestMethod -Uri "http://127.0.0.1:$ApiPort/health" -TimeoutSec 3
+                    if ($h.data.worker -eq "up") { $wkUp = $true; break }
+                } catch {}
+                Start-Sleep -Milliseconds 800
+            }
+            if ($wkUp) { Write-Good "worker 恢复就绪"; $results += @{ name = "worker 崩溃恢复"; ok = $true; detail = "recovered" } }
+            else { Write-Bad "worker 60s 未恢复"; $results += @{ name = "worker 崩溃恢复"; ok = $false; detail = "timeout" } }
+        } else {
+            Write-Good "worker 存活（本机实例未崩）"
+            $results += @{ name = "worker 崩溃恢复"; ok = $true; detail = "alive" }
+        }
     } else {
-        $results += @{ name = "readyz 摘除"; ok = $true; detail = "SKIP（无权限/无 Redis，需管理员运行完整演练）" }
-        Write-Info "Redis 演练跳过（无权限或无 Redis）；完整演练请以管理员身份运行："
-        Write-Info "  powershell -ExecutionPolicy Bypass -File scripts\demo.ps1 chaos"
+        $results += @{ name = "readyz 摘除"; ok = $true; detail = "SKIP（无 redis-cli 且无管理员权限）" }
+        Write-Info "Redis 演练跳过（无 redis-cli 且无管理员权限）"
     }
 
     # ---- 汇总 ----
