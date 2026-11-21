@@ -46,4 +46,5 @@ _opc_doc_dump.txt
 
 # Playwright 测试产物
 frontend/test-results/
+frontend/e2e/report.json
 frontend/playwright-report/
