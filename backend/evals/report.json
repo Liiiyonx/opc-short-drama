@@ -1,0 +1,37 @@
+{
+  "eval_set_version": "1.0",
+  "mode": "mock(deterministic)",
+  "total": 31,
+  "passed": 31,
+  "contract_pass_rate": 100.0,
+  "latency_p50_ms": 12.5,
+  "latency_p95_ms": 14.7,
+  "by_agent": {
+    "script": {
+      "total": 10,
+      "pass": 10,
+      "pass_rate": 100.0,
+      "latency_p95_ms": 18.0
+    },
+    "storyboard": {
+      "total": 6,
+      "pass": 6,
+      "pass_rate": 100.0,
+      "latency_p95_ms": 14.7
+    },
+    "translate": {
+      "total": 9,
+      "pass": 9,
+      "pass_rate": 100.0,
+      "latency_p95_ms": 14.1
+    },
+    "publish": {
+      "total": 6,
+      "pass": 6,
+      "pass_rate": 100.0,
+      "latency_p95_ms": 14.7
+    }
+  },
+  "failures": [],
+  "generated_at": "2026-11-21 18:43:52"
+}

@@ -1,0 +1,394 @@
+{
+  "version": "1.0",
+  "description": "黄金评测集（docs/08 §7.2）：30 条固定样例，覆盖 5 大市场 × 4 类智能体 × 正常/边界/敏感/超长输入。mock 模式下确定性运行，用于契约通过率回归；接入真实模型后同一套样例做质量与成本回归。",
+  "cases": [
+    {
+      "id": "script-na-normal",
+      "agent_type": "script",
+      "category": "normal",
+      "market": "北美",
+      "input": { "genre": "逆袭", "target_market": "北美", "episodes": 2, "episode_minutes": 2 },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "script-sea-normal",
+      "agent_type": "script",
+      "category": "normal",
+      "market": "东南亚",
+      "input": { "genre": "电商", "target_market": "东南亚", "episodes": 3, "episode_minutes": 1 },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "script-jp-normal",
+      "agent_type": "script",
+      "category": "normal",
+      "market": "日韩",
+      "input": { "genre": "甜宠", "target_market": "日韩", "episodes": 2, "episode_minutes": 2 },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "script-eu-normal",
+      "agent_type": "script",
+      "category": "normal",
+      "market": "欧洲",
+      "input": { "genre": "悬疑", "target_market": "欧洲", "episodes": 2, "episode_minutes": 3 },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "script-mena-normal",
+      "agent_type": "script",
+      "category": "normal",
+      "market": "中东",
+      "input": { "genre": "家族", "target_market": "中东", "episodes": 2, "episode_minutes": 2 },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "script-minimal",
+      "agent_type": "script",
+      "category": "edge",
+      "market": "北美",
+      "input": { "genre": "逆袭", "target_market": "北美", "episodes": 1, "episode_minutes": 1 },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "script-long-genre",
+      "agent_type": "script",
+      "category": "edge",
+      "market": "北美",
+      "input": {
+        "genre": "逆袭成长都市职场家庭伦理奇幻穿越多重反转高潮迭起热血燃向治愈系短剧题材",
+        "target_market": "北美",
+        "episodes": 2,
+        "episode_minutes": 2
+      },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "script-missing-market",
+      "agent_type": "script",
+      "category": "edge",
+      "market": "—",
+      "input": { "genre": "逆袭", "episodes": 2, "episode_minutes": 2 },
+      "expected_keys": [],
+      "expected_outcome": "reject",
+      "reject_reason": "缺 target_market 必填字段，契约闸门应 422"
+    },
+    {
+      "id": "script-negative-episodes",
+      "agent_type": "script",
+      "category": "edge",
+      "market": "北美",
+      "input": { "genre": "逆袭", "target_market": "北美", "episodes": -1, "episode_minutes": 2 },
+      "expected_keys": [],
+      "expected_outcome": "reject",
+      "reject_reason": "非法集数，契约闸门应 422"
+    },
+    {
+      "id": "script-sensitive",
+      "agent_type": "script",
+      "category": "sensitive",
+      "market": "北美",
+      "input": { "genre": "赌博一夜暴富", "target_market": "北美", "episodes": 1, "episode_minutes": 1 },
+      "expected_keys": ["episodes"],
+      "expected_outcome": "ok",
+      "note": "mock 无内容审查；真实模型接入后此例用于验证拒答/合规改写（计划书 §2.5 合规口径）"
+    },
+    {
+      "id": "sb-normal-1",
+      "agent_type": "storyboard",
+      "category": "normal",
+      "market": "北美",
+      "input": {
+        "episode_script": {
+          "title": "City of Second Chances EP1",
+          "logline": "A delivery boy builds an empire.",
+          "scenes": [
+            { "no": 1, "content": "Night city establishing shot." },
+            { "no": 2, "content": "Rooftop monologue about the first warehouse." }
+          ]
+        }
+      },
+      "expected_keys": ["shots"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "sb-normal-2",
+      "agent_type": "storyboard",
+      "category": "normal",
+      "market": "东南亚",
+      "input": {
+        "episode_script": {
+          "title": "Lucky Cart EP1",
+          "logline": "From a market stall to TikTok Shop.",
+          "scenes": [
+            { "no": 1, "content": "Market awning at dawn." },
+            { "no": 2, "content": "First viral order notification." },
+            { "no": 3, "content": "Packing handmade bags at midnight." }
+          ]
+        },
+        "style_hint": "warm realism"
+      },
+      "expected_keys": ["shots"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "sb-style-anime",
+      "agent_type": "storyboard",
+      "category": "normal",
+      "market": "日韩",
+      "input": {
+        "episode_script": {
+          "title": "Tokyo Lantern EP1",
+          "logline": "A lantern maker meets a time traveler.",
+          "scenes": [ { "no": 1, "content": "Lantern shop interior at dusk." } ]
+        },
+        "style_hint": "anime",
+        "aspect_ratio": "9:16"
+      },
+      "expected_keys": ["shots"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "sb-empty-scenes",
+      "agent_type": "storyboard",
+      "category": "edge",
+      "market": "北美",
+      "input": {
+        "episode_script": { "title": "Empty", "logline": "Nothing happens.", "scenes": [] }
+      },
+      "expected_keys": ["shots"],
+      "expected_outcome": "ok",
+      "note": "空场景表：契约允许，产物应为空镜头表或最简镜头"
+    },
+    {
+      "id": "sb-missing-script",
+      "agent_type": "storyboard",
+      "category": "edge",
+      "market": "—",
+      "input": { "style_hint": "anime" },
+      "expected_keys": [],
+      "expected_outcome": "reject",
+      "reject_reason": "缺 episode_script 必填字段"
+    },
+    {
+      "id": "sb-long-content",
+      "agent_type": "storyboard",
+      "category": "edge",
+      "market": "欧洲",
+      "input": {
+        "episode_script": {
+          "title": "The Long Night EP1",
+          "logline": "Slow burn.",
+          "scenes": [ { "no": 1, "content": "A very long scene description with rain-soaked streets, flickering neon reflections, a courier pedaling against the wind, intercut with the skyline slowly waking up, crowd silhouettes crossing the crosswalk, and a final push-in on a single lit window high above the city." } ]
+        }
+      },
+      "expected_keys": ["shots"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-en-normal",
+      "agent_type": "translate",
+      "category": "normal",
+      "market": "北美",
+      "input": {
+        "lines": [
+          { "line_id": 1, "text": "They said a delivery boy can't build an empire.", "role": "protagonist" },
+          { "line_id": 2, "text": "Six months later — forty-seven stores.", "role": "protagonist" }
+        ],
+        "source_lang": "en-US",
+        "target_locale": "en-US"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-zh-to-en",
+      "agent_type": "translate",
+      "category": "normal",
+      "market": "北美",
+      "input": {
+        "lines": [
+          { "line_id": 1, "text": "景德镇的最后一批窑火，差点熄灭。", "role": "narrator" },
+          { "line_id": 2, "text": "我把祖传手艺，搬进了跨境直播间。", "role": "protagonist" }
+        ],
+        "source_lang": "zh-CN",
+        "target_locale": "en-US"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-zh-to-ja",
+      "agent_type": "translate",
+      "category": "normal",
+      "market": "日韩",
+      "input": {
+        "lines": [ { "line_id": 1, "text": "外婆的秘方，是最好的商业计划书。", "role": "protagonist" } ],
+        "source_lang": "zh-CN",
+        "target_locale": "ja-JP"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-zh-to-ar",
+      "agent_type": "translate",
+      "category": "normal",
+      "market": "中东",
+      "input": {
+        "lines": [ { "line_id": 1, "text": "这座城没有记住我的名字，但记住了我的品牌。", "role": "protagonist" } ],
+        "source_lang": "zh-CN",
+        "target_locale": "ar-EG"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-zh-to-es",
+      "agent_type": "translate",
+      "category": "normal",
+      "market": "欧洲",
+      "input": {
+        "lines": [ { "line_id": 1, "text": "每一个拒绝信，都成了我的商业计划书。", "role": "protagonist" } ],
+        "source_lang": "zh-CN",
+        "target_locale": "es-ES"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-single-word",
+      "agent_type": "translate",
+      "category": "edge",
+      "market": "北美",
+      "input": {
+        "lines": [ { "line_id": 1, "text": "Run.", "role": "narrator" } ],
+        "target_locale": "en-US"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-long-line",
+      "agent_type": "translate",
+      "category": "edge",
+      "market": "东南亚",
+      "input": {
+        "lines": [ { "line_id": 1, "text": "这是一句特别长的台词，需要考验字幕切分与跨文化改写的稳健性，中间夹杂了大量铺垫描写、人物独白、情绪递进与画面提示，甚至还有第二层括号内的补充说明（用于模拟真实剧本里常见的超长口播段），直到最后才落下真正的重点。", "role": "narrator" } ],
+        "target_locale": "en-US"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "tr-empty-lines",
+      "agent_type": "translate",
+      "category": "edge",
+      "market": "—",
+      "input": { "lines": [], "target_locale": "en-US" },
+      "expected_keys": [],
+      "expected_outcome": "reject",
+      "reject_reason": "lines min_length=1，契约闸门应 422"
+    },
+    {
+      "id": "tr-slang",
+      "agent_type": "translate",
+      "category": "sensitive",
+      "market": "北美",
+      "input": {
+        "lines": [
+          { "line_id": 1, "text": "这个项目黄了，哥们儿血本无归。", "role": "protagonist" }
+        ],
+        "source_lang": "zh-CN",
+        "target_locale": "en-US",
+        "context": "short_drama"
+      },
+      "expected_keys": ["lines"],
+      "expected_outcome": "ok",
+      "note": "俚语跨文化改写：真实模型验收点（俚语不得直译）"
+    },
+    {
+      "id": "pub-na-normal",
+      "agent_type": "publish",
+      "category": "normal",
+      "market": "北美",
+      "input": {
+        "title": "City of Second Chances",
+        "target_market": "北美",
+        "synopsis": "A delivery boy builds a cross-border empire.",
+        "genre": "逆袭",
+        "duration_seconds": 30.2
+      },
+      "expected_keys": ["platforms"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "pub-sea-normal",
+      "agent_type": "publish",
+      "category": "normal",
+      "market": "东南亚",
+      "input": {
+        "title": "Lucky Cart",
+        "target_market": "东南亚",
+        "synopsis": "From a market stall to TikTok Shop.",
+        "genre": "电商",
+        "duration_seconds": 30.5
+      },
+      "expected_keys": ["platforms"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "pub-custom-platforms",
+      "agent_type": "publish",
+      "category": "edge",
+      "market": "日韩",
+      "input": {
+        "title": "Tokyo Lantern",
+        "target_market": "日韩",
+        "synopsis": "A lantern maker meets a time traveler.",
+        "platforms": ["TikTok", "YouTube Shorts", "Instagram Reels"]
+      },
+      "expected_keys": ["platforms"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "pub-minimal",
+      "agent_type": "publish",
+      "category": "edge",
+      "market": "北美",
+      "input": { "title": "Untitled Pilot" },
+      "expected_keys": ["platforms"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "pub-long-synopsis",
+      "agent_type": "publish",
+      "category": "edge",
+      "market": "欧洲",
+      "input": {
+        "title": "The Long Night",
+        "target_market": "欧洲",
+        "synopsis": "Season synopsis: twelve episodes of slow-burn rivalry across two continents, from a failing courier startup to a cross-border brand, told through pitch meetings, betrayals, dawn deliveries and one impossible contract."
+      },
+      "expected_keys": ["platforms"],
+      "expected_outcome": "ok"
+    },
+    {
+      "id": "pub-missing-title",
+      "agent_type": "publish",
+      "category": "edge",
+      "market": "—",
+      "input": { "synopsis": "No title given." },
+      "expected_keys": [],
+      "expected_outcome": "reject",
+      "reject_reason": "缺 title 必填字段，契约闸门应 422"
+    }
+  ]
+}

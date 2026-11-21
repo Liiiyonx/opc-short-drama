@@ -1,4 +1,4 @@
-"""演示数据种子：四角色账号 + 课程 + 实训任务 + 工单。
+"""演示数据种子：四角色账号 + 课程 + 实训任务 + 工单 + 展示剧集。
 
 用法（在 backend/ 目录）：
     python -m scripts.seed
@@ -9,8 +9,15 @@
     student01 / student123  学生（电子商务）
     student02 / student123  学生（商务英语）
     enterprise01 / ent123456  企业（已认证）
+
+P0-12/9.2 展示数据包：若 scenarios/ 存在已生成样片，会把样片作为
+student01 的「展示剧集」成片落库（首次进入即有可播作品），并附带
+五维能力快照与两张待审核工单，保证演示首屏不空、闭环可讲。
 """
 import asyncio
+import json
+import shutil
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -23,8 +30,10 @@ from app.models.profile import (
     StudentProfile,
     TeacherProfile,
 )
+from app.models.review import AbilitySnapshot
 from app.models.task import TrainingTask
 from app.models.user import User
+from app.models.work import Work, WorkAsset
 from app.services.tasks import DEFAULT_RUBRIC
 
 USERS = [
@@ -38,6 +47,162 @@ USERS = [
 COURSE_CODE = "CROSS201"
 COURSE_NAME = "AIGC跨境内容创作"
 DEMO_TASK_TITLE = "示范任务：短剧出海全流程实战"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+SCENARIOS_ROOT = REPO_ROOT / "scenarios"
+
+SHOWCASE_SCRIPT_TITLE = "展示剧集：《海潮女王的逆袭》剧本"
+SHOWCASE_VIDEO_TITLE = "展示剧集：《海潮女王的逆袭》成片"
+
+ABILITY_DEMO = [
+    ("内容创作", 88),
+    ("跨文化沟通", 82),
+    ("电商运营", 79),
+    ("AI工具应用", 90),
+    ("数据分析", 76),
+]
+
+PENDING_ORDERS = [
+    ("演示工单：宠物拟人微短剧《毛孩当家》", 260000,
+     {"genre": "治愈", "market": "东南亚", "episodes": 4, "lang": "en-US",
+      "delivery": "成片 MP4 + 双语字幕"}),
+    ("演示工单：县域产业带好物剧《山货上星》", 320000,
+     {"genre": "电商", "market": "北美", "episodes": 6, "lang": "en-US",
+      "delivery": "成片 MP4 + 发布参数包"}),
+]
+
+
+def _pick_scenario() -> Path | None:
+    """优先北美样片（答辩主线），其次任意已生成场景。"""
+    for name in ("north-america-revenge", "culture-export", "southeast-asia-commerce"):
+        candidate = SCENARIOS_ROOT / name
+        if (candidate / "final.mp4").exists():
+            return candidate
+    if SCENARIOS_ROOT.exists():
+        for candidate in sorted(SCENARIOS_ROOT.iterdir()):
+            if (candidate / "final.mp4").exists():
+                return candidate
+    return None
+
+
+def _scenario_duration_ms(scenario_dir: Path) -> int | None:
+    report = scenario_dir / "qc-report.json"
+    try:
+        return int(json.loads(report.read_text(encoding="utf-8"))["stats"]["duration_ms"])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+async def _seed_showcase(db) -> None:
+    """展示数据包：样片成片 + 能力快照 + 待审核工单（全部幂等）。"""
+    student = (
+        await db.execute(select(User).where(User.username == "student01"))
+    ).scalar_one_or_none()
+    enterprise = (
+        await db.execute(select(User).where(User.role == "enterprise"))
+    ).scalars().first()
+    if student is None or enterprise is None:
+        print("skip showcase（演示账号缺失）")
+        return
+
+    # 1) 五维能力快照（学生工作台首屏能力条有数据）
+    has_ability = (
+        await db.execute(
+            select(AbilitySnapshot).where(AbilitySnapshot.student_id == student.id)
+        )
+    ).scalars().first()
+    if has_ability is None:
+        for dimension, score in ABILITY_DEMO:
+            db.add(
+                AbilitySnapshot(
+                    student_id=student.id,
+                    dimension=dimension,
+                    score=score,
+                    source="review",
+                    ref_id=0,
+                )
+            )
+        print("created showcase ability snapshots（五维）")
+
+    # 2) 展示剧集：剧本 + 成片（样片视频进存储并落库）
+    scenario = _pick_scenario()
+    if scenario is not None:
+        script_work = (
+            await db.execute(select(Work).where(Work.title == SHOWCASE_SCRIPT_TITLE))
+        ).scalar_one_or_none()
+        if script_work is None:
+            script_work = Work(
+                owner_type="user",
+                owner_id=student.id,
+                title=SHOWCASE_SCRIPT_TITLE,
+                type="script",
+                status="ready",
+                meta_json={
+                    "genre": "逆袭",
+                    "target_market": "北美",
+                    "episodes": 1,
+                    "note": "演示剧本：来自 scenarios/north-america-revenge 确定性场景包",
+                },
+                created_by=student.id,
+            )
+            db.add(script_work)
+            await db.flush()
+            print("created showcase script work")
+
+        video_work = (
+            await db.execute(select(Work).where(Work.title == SHOWCASE_VIDEO_TITLE))
+        ).scalar_one_or_none()
+        if video_work is None:
+            video_work = Work(
+                owner_type="user",
+                owner_id=student.id,
+                title=SHOWCASE_VIDEO_TITLE,
+                type="video",
+                status="ready",
+                ai_declare_json={
+                    "agents_used": ["script", "storyboard", "tts", "compose"],
+                    "human_edit_ratio": 0.2,
+                    "note": "样片由确定性演示流水线生成（scenarios 包），素材均为程序化/合成，无第三方版权",
+                },
+                created_by=student.id,
+            )
+            db.add(video_work)
+            await db.flush()
+            # 视频文件进本地存储 + 资产落库（键规范与 save_asset 一致）
+            video_src = scenario / "final.mp4"
+            storage_key = f"works/{video_work.id}/video/showcase_final.mp4"
+            from app.services.storage.factory import get_storage
+
+            get_storage().put(storage_key, video_src.read_bytes(), "video/mp4")
+            db.add(
+                WorkAsset(
+                    work_id=video_work.id,
+                    kind="video",
+                    storage_key=storage_key,
+                    mime="video/mp4",
+                    size=video_src.stat().st_size,
+                    duration_ms=_scenario_duration_ms(scenario),
+                )
+            )
+            print(f"created showcase video work（{scenario.name} → {storage_key}）")
+
+    # 3) 两张待审核工单（教师合规审核演示有米下锅）
+    for title, budget, requirements in PENDING_ORDERS:
+        exists = (
+            await db.execute(select(WorkOrder).where(WorkOrder.title == title))
+        ).scalar_one_or_none()
+        if exists is None:
+            db.add(
+                WorkOrder(
+                    enterprise_id=enterprise.id,
+                    title=title,
+                    requirements_json=requirements,
+                    budget_cents=budget,
+                    status="pending_review",
+                    verify_note="演示数据：企业已提交，等待教师合规审核",
+                )
+            )
+            print(f"created pending order: {title[:20]}…")
 
 
 async def seed() -> None:
@@ -156,6 +321,7 @@ async def seed() -> None:
                         )
                     )
                     print("created demo order")
+        await _seed_showcase(db)
         await db.commit()
     print("seed done")
 
