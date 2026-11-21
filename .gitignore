@@ -43,3 +43,7 @@ Thumbs.db
 gui-test-screenshots/
 backups/
 _opc_doc_dump.txt
+
+# Playwright 测试产物
+frontend/test-results/
+frontend/playwright-report/

@@ -127,8 +127,14 @@ export async function downloadFile(path, filename) {
 
 // ---------- 认证 ----------
 export async function login(payload) {
-  const response = await axios.post('/api/v1/auth/login', payload)
-  return response.data.data
+  // 登录失败要透出后端中文 message（axios 默认 error.message 是英文状态码描述）
+  try {
+    const response = await axios.post('/api/v1/auth/login', payload)
+    return response.data.data
+  } catch (err) {
+    const message = err.response && err.response.data && err.response.data.message
+    throw new Error(message || '登录失败，请检查网络或稍后重试')
+  }
 }
 
 // ---------- 系统健康（管理员，P0-10；/health 不在 /api/v1 下，走原生 axios 不解包） ----------
